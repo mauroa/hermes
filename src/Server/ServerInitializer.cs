@@ -11,6 +11,8 @@ namespace Hermes
 	{
 		public Server Initialize(ProtocolConfiguration configuration)
 		{
+			var logger = new Logger ();
+
 			var listener = new TcpListener(IPAddress.Any, configuration.Port);
 
 			listener.Start ();
@@ -27,10 +29,10 @@ namespace Hermes
 			var channelFactory = new PacketChannelFactory (topicEvaluator);
 			var repositoryProvider = new InMemoryRepositoryProvider ();
 			var connectionProvider = new ConnectionProvider ();
-			var flowProvider = new ServerProtocolFlowProvider (connectionProvider, topicEvaluator, repositoryProvider, configuration);
-			var channelAdapter = new ServerPacketChannelAdapter (connectionProvider, flowProvider, configuration);
+			var flowProvider = new ServerProtocolFlowProvider (connectionProvider, topicEvaluator, repositoryProvider, configuration, logger);
+			var channelAdapter = new ServerPacketChannelAdapter (connectionProvider, flowProvider, configuration, logger);
 
-			return new Server (socketProvider, channelFactory, channelAdapter, connectionProvider, configuration);
+			return new Server (socketProvider, channelFactory, channelAdapter, connectionProvider, configuration, logger);
 		}
 	}
 }

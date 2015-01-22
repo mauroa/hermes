@@ -16,6 +16,9 @@
     <Compile Include="..\GlobalAssemblyInfo.cs">
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="..\Server\Logger.cs">
+      <Link>Logger.cs</Link>
+    </Compile>
     <Compile Include="..\Server\ProtocolChannel.cs">
       <Link>ProtocolChannel.cs</Link>
     </Compile>

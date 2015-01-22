@@ -11,16 +11,19 @@ namespace Hermes.Flows
 	public class PublishSenderFlow : PublishFlow, IPublishSenderFlow
 	{
 		readonly IRepository<PacketIdentifier> packetIdentifierRepository;
+		readonly ILogger logger;
 
 		IDictionary<PacketType, Func<string, ushort, IFlowPacket>> senderRules;
 
 		public PublishSenderFlow (IRepository<ClientSession> sessionRepository,
 			IRepository<PacketIdentifier> packetIdentifierRepository,
-			ProtocolConfiguration configuration)
+			ProtocolConfiguration configuration,
+			ILogger logger)
 			: base(sessionRepository, configuration)
 		{
 			this.packetIdentifierRepository = packetIdentifierRepository;
-				
+			this.logger = logger;
+
 			this.DefineSenderRules ();
 		}
 
@@ -60,6 +63,8 @@ namespace Hermes.Flows
 				this.MonitorAck<PublishReceived> (message, channel);
 
 			await channel.SendAsync (message);
+
+			this.logger.Log ("Sent Publish to {0} - Topic: {1} - Length: {2}", clientId, message.Topic, message.Payload.Length);
 		}
 
 		private void DefineSenderRules ()

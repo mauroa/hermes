@@ -12,14 +12,17 @@ namespace Hermes
 		readonly IConnectionProvider connectionProvider;
 		readonly IProtocolFlowProvider flowProvider;
 		readonly ProtocolConfiguration configuration;
+		readonly ILogger logger;
 
 		public ServerPacketChannelAdapter (IConnectionProvider connectionProvider, 
 			IProtocolFlowProvider flowProvider,
-			ProtocolConfiguration configuration)
+			ProtocolConfiguration configuration,
+			ILogger logger)
 		{
 			this.connectionProvider = connectionProvider;
 			this.flowProvider = flowProvider;
 			this.configuration = configuration;
+			this.logger = logger;
 		}
 
 		public IChannel<IPacket> Adapt (IChannel<IPacket> channel)
@@ -46,13 +49,18 @@ namespace Hermes
 					this.connectionProvider.AddConnection (clientId, protocolChannel);
 
 					await this.DispatchPacketAsync (connect, clientId, protocolChannel);
-					
-					if (keepAlive > 0) {
-						this.MonitorKeepAlive (protocolChannel, clientId, keepAlive);
-					}
 				}, async ex => {
 					await this.HandleConnectionExceptionAsync (ex, protocolChannel);
 				});
+
+			protocolChannel.Sender
+				.OfType<ConnectAck> ()
+				.FirstAsync ()
+				.Subscribe (connectAck => {
+					if (keepAlive > 0) {
+						this.MonitorKeepAlive (protocolChannel, clientId, keepAlive);
+					}
+				}, ex => {});
 
 			protocolChannel.Receiver
 				.Skip (1)
@@ -95,6 +103,12 @@ namespace Hermes
 			if (flow != null) {
 				try {
 					await flow.ExecuteAsync (clientId, packet, channel);
+
+					if (packet.Type == PacketType.Publish) {
+						var publish = packet as Publish;
+
+						this.logger.Log ("Dispatched Publish from client: {0} - Topic: {1} - Length: {2}", clientId, publish.Topic, publish.Payload.Length);
+					}
 				} catch (Exception ex) {
 					this.NotifyError (ex, clientId, channel);
 				}
@@ -111,7 +125,6 @@ namespace Hermes
 		private void MonitorKeepAlive(ProtocolChannel channel, string clientId, int keepAlive)
 		{
 			channel.Receiver
-				.Skip (1)
 				.Timeout (GetKeepAliveTolerance(keepAlive))
 				.Subscribe(_ => {}, ex => {
 					var message = string.Format (Resources.ServerPacketChannelAdapter_KeepAliveTimeExceeded, keepAlive);

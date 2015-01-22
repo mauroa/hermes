@@ -11,16 +11,19 @@ namespace Hermes.Flows
 		protected readonly ITopicEvaluator topicEvaluator;
 		protected readonly IRepositoryProvider repositoryProvider;
 		protected readonly ProtocolConfiguration configuration;
+		protected readonly ILogger logger;
 
 		IDictionary<ProtocolFlowType, IProtocolFlow> flows;
 
 		protected ProtocolFlowProvider (ITopicEvaluator topicEvaluator, 
 			IRepositoryProvider repositoryProvider, 
-			ProtocolConfiguration configuration)
+			ProtocolConfiguration configuration,
+			ILogger logger)
 		{
 			this.topicEvaluator = topicEvaluator;
 			this.repositoryProvider = repositoryProvider;
 			this.configuration = configuration;
+			this.logger = logger;
 		}
 
 		protected abstract IDictionary<ProtocolFlowType, IProtocolFlow> InitializeFlows ();

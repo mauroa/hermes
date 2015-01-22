@@ -6,8 +6,8 @@ namespace Hermes.Flows
 {
 	public class ClientProtocolFlowProvider : ProtocolFlowProvider
 	{
-		public ClientProtocolFlowProvider (ITopicEvaluator topicEvaluator, IRepositoryProvider repositoryProvider, ProtocolConfiguration configuration)
-			: base(topicEvaluator, repositoryProvider, configuration)
+		public ClientProtocolFlowProvider (ITopicEvaluator topicEvaluator, IRepositoryProvider repositoryProvider, ProtocolConfiguration configuration, ILogger logger)
+			: base(topicEvaluator, repositoryProvider, configuration, logger)
 		{
 		}
 
@@ -19,7 +19,7 @@ namespace Hermes.Flows
 			var retainedRepository = repositoryProvider.GetRepository<RetainedMessage> ();
 			var packetIdentifierRepository = repositoryProvider.GetRepository<PacketIdentifier> ();
 
-			var senderFlow = new PublishSenderFlow (sessionRepository, packetIdentifierRepository,configuration);
+			var senderFlow = new PublishSenderFlow (sessionRepository, packetIdentifierRepository, configuration, this.logger);
 
 			flows.Add (ProtocolFlowType.Connect, new ClientConnectFlow (sessionRepository, senderFlow));
 			flows.Add (ProtocolFlowType.PublishSender, senderFlow);

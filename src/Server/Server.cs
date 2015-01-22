@@ -18,6 +18,7 @@ namespace Hermes
 		readonly IPacketChannelAdapter channelAdapter;
 		readonly IConnectionProvider connectionProvider;
 		readonly ProtocolConfiguration configuration;
+		readonly ILogger logger;
 
 		readonly IList<IChannel<IPacket>> channels = new List<IChannel<IPacket>> ();
 
@@ -26,13 +27,15 @@ namespace Hermes
 			IPacketChannelFactory channelFactory, 
 			IPacketChannelAdapter channelAdapter,
 			IConnectionProvider connectionProvider,
-			ProtocolConfiguration configuration)
+			ProtocolConfiguration configuration,
+			ILogger logger)
 		{
 			this.binaryChannelProvider = binaryChannelProvider;
 			this.channelFactory = channelFactory;
 			this.channelAdapter = channelAdapter;
 			this.connectionProvider = connectionProvider;
 			this.configuration = configuration;
+			this.logger = logger;
 		}
 
 		public event EventHandler<ClosedEventArgs> Stopped = (sender, args) => { };
@@ -92,19 +95,15 @@ namespace Hermes
 			var packetChannel = this.channelFactory.Create (binaryChannel);
 			var protocolChannel = this.channelAdapter.Adapt (packetChannel);
 
-			protocolChannel.Sender.Subscribe (_ => {
-			}, ex => {
+			protocolChannel.Sender.Subscribe (_ => {}, ex => {
 				tracer.Error (ex);
+				this.logger.Log ("Error - Message: {0}", ex.ToString ());
 				this.CloseChannel (protocolChannel);
-			}, () => {
-				this.CloseChannel (protocolChannel);	
 			});
 
-			protocolChannel.Receiver.Subscribe (_ => {
-			}, ex => { 
+			protocolChannel.Receiver.Subscribe (_ => {}, ex => { 
 				tracer.Error (ex);
-				this.CloseChannel (protocolChannel);
-			}, () => { 
+				this.logger.Log ("Error - Message: {0}", ex.ToString ());
 				this.CloseChannel (protocolChannel);
 			});
 

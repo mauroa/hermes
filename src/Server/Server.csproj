@@ -52,6 +52,7 @@
     <Compile Include="Flows\ServerConnectFlow.cs" />
     <Compile Include="Flows\ServerUnsubscribeFlow.cs" />
     <Compile Include="IConnectionProvider.cs" />
+    <Compile Include="Logger.cs" />
     <Compile Include="netfx\System\Guard.cs" />
     <Compile Include="netfx\System\Reactive\EventPattern.cs" />
     <Compile Include="netfx\System\Reactive\EventStream.cs" />

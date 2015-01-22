@@ -25,13 +25,15 @@ namespace Hermes
 		readonly IRepository<ClientSession> sessionRepository;
 		readonly IRepository<PacketIdentifier> packetIdentifierRepository;
 		readonly ProtocolConfiguration configuration;
+		readonly ILogger logger;
 
         public Client(IChannel<byte[]> binaryChannel, 
 			IPacketChannelFactory channelFactory, 
 			IPacketChannelAdapter channelAdapter,
 			IProtocolFlowProvider flowProvider,
 			IRepositoryProvider repositoryProvider,
-			ProtocolConfiguration configuration)
+			ProtocolConfiguration configuration,
+			ILogger logger)
         {
 			var channel = channelFactory.Create (binaryChannel);
 
@@ -40,8 +42,11 @@ namespace Hermes
 			this.sessionRepository = repositoryProvider.GetRepository<ClientSession>();
 			this.packetIdentifierRepository = repositoryProvider.GetRepository<PacketIdentifier>();
 			this.configuration = configuration;
+			this.logger = logger;
 
 			this.protocolChannel.Receiver.OfType<Publish>().Subscribe (publish => {
+				this.logger.Log ("Message Received - Client: {0} - Topic: {1} - Lenght: {2}", this.Id, publish.Topic, publish.Payload.Length);
+
 				var message = new ApplicationMessage (publish.Topic, publish.Payload);
 
 				this.receiver.OnNext (message);
@@ -57,7 +62,7 @@ namespace Hermes
 					}, () => {
 						this.receiver.OnCompleted ();
 						this.sender.OnCompleted ();
-						this.Close (ClosedReason.Disconnect);
+						this.logger.Log ("Sender Completed - Client: {0}", this.Id);
 					});
 
 			this.protocolChannel.Receiver
@@ -70,7 +75,7 @@ namespace Hermes
 					}, () => {
 						this.receiver.OnCompleted ();
 						this.sender.OnCompleted();
-						this.Close (ClosedReason.Disconnect);
+						this.logger.Log ("Receiver Completed - Client: {0}", this.Id);
 					});
         }
 
@@ -117,15 +122,16 @@ namespace Hermes
 				KeepAlive = this.configuration.KeepAliveSecs
 			};
 
-			var ackSubscription = this.protocolChannel.Receiver
-					.OfType<ConnectAck> ();
 			var ack = default (ConnectAck);
 			var connectTimeout = new TimeSpan(0, 0, this.configuration.WaitingTimeoutSecs);
 
 			try {
-				await this.SendPacket (connect);
+				var connectTask = this.SendPacket (connect);
 
-				ack = await ackSubscription.FirstOrDefaultAsync ().Timeout(connectTimeout);
+				ack = await this.protocolChannel.Receiver
+					.OfType<ConnectAck> ()
+					.FirstOrDefaultAsync ()
+					.Timeout(connectTimeout);
 			} catch(TimeoutException timeEx) {
 				throw new ClientException (Resources.Client_ConnectionTimeout, timeEx);
 			} catch (Exception ex) {
@@ -133,13 +139,16 @@ namespace Hermes
 			}
 
 			if (ack == null) {
-				throw new ClientException (Resources.Client_ConnectionDisconnected);
+				var message = string.Format(Resources.Client_ConnectionDisconnected, credentials.ClientId);
+
+				throw new ClientException (message);
 			}
 
 			this.Id = credentials.ClientId;
 			this.IsConnected = true;
 		}
 
+		/// <exception cref="ClientException">ClientException</exception>
 		public async Task SubscribeAsync (string topicFilter, QualityOfService qos)
 		{
 			if (this.disposed)
@@ -148,7 +157,31 @@ namespace Hermes
 			var packetId = this.packetIdentifierRepository.GetUnusedPacketIdentifier(new Random());
 			var subscribe = new Subscribe (packetId, new Subscription (topicFilter, qos));
 
-			await this.SendPacket (subscribe);
+			var ack = default (SubscribeAck);
+			var subscribeTimeout = new TimeSpan(0, 0, this.configuration.WaitingTimeoutSecs);
+
+			try {
+				var subscribeTask = this.SendPacket (subscribe);
+
+				ack = await this.protocolChannel.Receiver
+					.OfType<SubscribeAck> ()
+					.FirstOrDefaultAsync (x => x.PacketId == packetId)
+					.Timeout(subscribeTimeout);;
+			} catch(TimeoutException timeEx) {
+				var message = string.Format (Resources.Client_SubscribeTimeout, this.Id, topicFilter);
+
+				throw new ClientException (message, timeEx);
+			} catch (Exception ex) {
+				var message = string.Format (Resources.Client_SubscribeError, this.Id, topicFilter);
+
+				throw new ClientException (message, ex);
+			}
+
+			if (ack == null) {
+				var message = string.Format(Resources.Client_SubscriptionDisconnected, this.Id, topicFilter);
+
+				throw new ClientException (message);
+			}
 		}
 
 		public async Task PublishAsync (ApplicationMessage message, QualityOfService qos, bool retain = false)
@@ -165,6 +198,8 @@ namespace Hermes
 			var senderFlow = this.flowProvider.GetFlow<PublishSenderFlow> ();
 
 			await senderFlow.SendPublishAsync (this.Id, publish, this.protocolChannel);
+
+			this.logger.Log ("Message Sent - Client: {0} - Topic: {1} - Lenght: {2}", this.Id, publish.Topic, publish.Payload.Length);
 		}
 
 		public async Task UnsubscribeAsync (params string[] topics)
@@ -207,15 +242,21 @@ namespace Hermes
 			if (this.disposed) return;
 
 			if (disposing) {
+				this.protocolChannel.Dispose ();
 				this.IsConnected = false; 
 				this.Id = null;
-				this.protocolChannel.Dispose ();
 				this.disposed = true;
 			}
 		}
 
 		private void Close (ClosedReason reason, string message = null)
 		{
+			if (reason == ClosedReason.Error) {
+				this.logger.Log ("Error - Client: {0} - Message: {1}", this.Id, message ?? "N/A");
+			} else {
+				this.logger.Log ("Closed - Client: {0} - Message: {1}", this.Id, message ?? "N/A");
+			}
+
 			this.Dispose (true);
 			this.Closed (this, new ClosedEventArgs(reason, message));
 			GC.SuppressFinalize (this);
