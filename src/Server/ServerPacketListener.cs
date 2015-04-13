@@ -22,6 +22,7 @@ namespace Hermes
 
 		readonly IConnectionProvider connectionProvider;
 		readonly IProtocolFlowProvider flowProvider;
+		readonly IPublishDispatcher publishDispatcher;
 		readonly ProtocolConfiguration configuration;
 		readonly ReplaySubject<IPacket> packets;
 		readonly TaskRunner dispatcher;
@@ -29,10 +30,12 @@ namespace Hermes
 
 		public ServerPacketListener (IConnectionProvider connectionProvider, 
 			IProtocolFlowProvider flowProvider,
+			IPublishDispatcher publishDispatcher,
 			ProtocolConfiguration configuration)
 		{
 			this.connectionProvider = connectionProvider;
 			this.flowProvider = flowProvider;
+			this.publishDispatcher = publishDispatcher;
 			this.configuration = configuration;
 			this.packets = new ReplaySubject<IPacket> (window: TimeSpan.FromSeconds(configuration.WaitingTimeoutSecs));
 			this.dispatcher = TaskRunner.Get ();

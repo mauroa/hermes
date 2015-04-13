@@ -17,6 +17,7 @@ namespace Tests
 		{
 			var connectionProvider = new Mock<IConnectionProvider> ();
 			var flowProvider = new Mock<IProtocolFlowProvider> ();
+			var publishDispatcher = new Mock<IPublishDispatcher> ();
 			var repositoryProvider = Mock.Of<IRepositoryProvider> ();
 
 			var flow = new Mock<IProtocolFlow>();
@@ -24,7 +25,7 @@ namespace Tests
 			flowProvider.Setup (p => p.GetFlow (It.IsAny<PacketType> ())).Returns (flow.Object);
 
 			var configuration = new ProtocolConfiguration { WaitingTimeoutSecs = 10 };
-			var listener = new ServerPacketListener (connectionProvider.Object, flowProvider.Object, configuration);
+			var listener = new ServerPacketListener (connectionProvider.Object, flowProvider.Object, publishDispatcher.Object, configuration);
 
 			var receiver = new Subject<IPacket> ();
 			var packetChannel = new Mock<IChannel<IPacket>> ();
@@ -51,9 +52,10 @@ namespace Tests
 		{
 			var connectionProvider = new Mock<IConnectionProvider> ();
 			var flowProvider = Mock.Of<IProtocolFlowProvider> ();
+			var publishDispatcher = new Mock<IPublishDispatcher> ();
 			var repositoryProvider = Mock.Of<IRepositoryProvider> ();
 			var configuration = new ProtocolConfiguration { WaitingTimeoutSecs = 10 };
-			var listener = new ServerPacketListener (connectionProvider.Object, flowProvider, configuration);
+			var listener = new ServerPacketListener (connectionProvider.Object, flowProvider, publishDispatcher.Object, configuration);
 
 			var receiver = new Subject<IPacket> ();
 			var packetChannel = new Mock<IChannel<IPacket>> ();
@@ -76,10 +78,11 @@ namespace Tests
 		{
 			var connectionProvider = new Mock<IConnectionProvider> ();
 			var flowProvider = Mock.Of<IProtocolFlowProvider> ();
+			var publishDispatcher = new Mock<IPublishDispatcher> ();
 			var repositoryProvider = Mock.Of<IRepositoryProvider> ();
 			var waitingTimeout = 1;
 			var configuration = new ProtocolConfiguration { WaitingTimeoutSecs = waitingTimeout };
-			var listener = new ServerPacketListener (connectionProvider.Object, flowProvider, configuration);
+			var listener = new ServerPacketListener (connectionProvider.Object, flowProvider, publishDispatcher.Object, configuration);
 
 			var receiver = new Subject<IPacket> ();
 			var packetChannel = new Mock<IChannel<IPacket>> ();
@@ -105,10 +108,11 @@ namespace Tests
 		{
 			var connectionProvider = new Mock<IConnectionProvider> ();
 			var flowProvider = Mock.Of<IProtocolFlowProvider> ();
+			var publishDispatcher = new Mock<IPublishDispatcher> ();
 			var repositoryProvider = Mock.Of<IRepositoryProvider> ();
 			var waitingTimeout = 1;
 			var configuration = new ProtocolConfiguration { WaitingTimeoutSecs = waitingTimeout };
-			var listener = new ServerPacketListener (connectionProvider.Object, flowProvider, configuration);
+			var listener = new ServerPacketListener (connectionProvider.Object, flowProvider, publishDispatcher.Object, configuration);
 
 			var receiver = new Subject<IPacket> ();
 			var packetChannel = new Mock<IChannel<IPacket>> ();
@@ -137,9 +141,10 @@ namespace Tests
 		{
 			var connectionProvider = new Mock<IConnectionProvider> ();
 			var flowProvider = Mock.Of<IProtocolFlowProvider> ();
+			var publishDispatcher = new Mock<IPublishDispatcher> ();
 			var repositoryProvider = Mock.Of<IRepositoryProvider> ();
 			var configuration = new ProtocolConfiguration { WaitingTimeoutSecs = 10 };
-			var listener = new ServerPacketListener (connectionProvider.Object, flowProvider, configuration);
+			var listener = new ServerPacketListener (connectionProvider.Object, flowProvider, publishDispatcher.Object, configuration);
 
 			var receiver = new Subject<IPacket> ();
 			var packetChannel = new Mock<IChannel<IPacket>> ();
@@ -168,8 +173,9 @@ namespace Tests
 			connectionProvider.Setup (p => p.RemoveConnection (It.IsAny<string> ()));
 
 			var flowProvider = Mock.Of<IProtocolFlowProvider> ();
+			var publishDispatcher = new Mock<IPublishDispatcher> ();
 			var configuration = new ProtocolConfiguration { WaitingTimeoutSecs = 10 };
-			var listener = new ServerPacketListener (connectionProvider.Object, flowProvider, configuration);
+			var listener = new ServerPacketListener (connectionProvider.Object, flowProvider, publishDispatcher.Object, configuration);
 
 			var receiver = new Subject<IPacket> ();
 			var packetChannel = new Mock<IChannel<IPacket>> ();
@@ -206,8 +212,9 @@ namespace Tests
 			flowProvider.Setup (p => p.GetFlow (It.IsAny<PacketType> ()))
 				.Returns (Mock.Of<IProtocolFlow> ());
 
+			var publishDispatcher = new Mock<IPublishDispatcher> ();
 			var configuration = new ProtocolConfiguration { WaitingTimeoutSecs = 10 };
-			var listener = new ServerPacketListener (connectionProvider.Object, flowProvider.Object, configuration);
+			var listener = new ServerPacketListener (connectionProvider.Object, flowProvider.Object, publishDispatcher.Object, configuration);
 
 			var receiver = new Subject<IPacket> ();
 			var sender = new Subject<IPacket> ();
@@ -250,9 +257,10 @@ namespace Tests
 			flowProvider.Setup (p => p.GetFlow (It.IsAny<PacketType> ()))
 				.Returns (Mock.Of<IProtocolFlow> ());
 
+			var publishDispatcher = new Mock<IPublishDispatcher> ();
 			var repositoryProvider = Mock.Of<IRepositoryProvider> ();
 			var configuration = new ProtocolConfiguration { WaitingTimeoutSecs = 10 };
-			var listener = new ServerPacketListener (connectionProvider.Object, flowProvider.Object, configuration);
+			var listener = new ServerPacketListener (connectionProvider.Object, flowProvider.Object, publishDispatcher.Object, configuration);
 
 			var receiver = new Subject<IPacket> ();
 			var packetChannel = new Mock<IChannel<IPacket>> ();
@@ -288,9 +296,10 @@ namespace Tests
 			flowProvider.Setup (p => p.GetFlow (It.IsAny<PacketType> ()))
 				.Returns (Mock.Of<IProtocolFlow> ());
 
+			var publishDispatcher = new Mock<IPublishDispatcher> ();
 			var repositoryProvider = Mock.Of<IRepositoryProvider> ();
 			var configuration = new ProtocolConfiguration { WaitingTimeoutSecs = 10 };
-			var listener = new ServerPacketListener (connectionProvider.Object, flowProvider.Object, configuration);
+			var listener = new ServerPacketListener (connectionProvider.Object, flowProvider.Object, publishDispatcher.Object, configuration);
 
 			var receiver = new Subject<IPacket> ();
 			var packetChannel = new Mock<IChannel<IPacket>> ();

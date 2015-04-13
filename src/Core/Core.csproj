@@ -23,6 +23,9 @@
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
     <Compile Include="ByteExtensions.cs" />
+    <Compile Include="DispatchUnit.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="Exceptions\RepositoryException.cs" />
     <Compile Include="Extensions.cs" />
     <Compile Include="External\Diagnostics\Tracer\ITracer.cs" />
@@ -60,6 +63,9 @@
     <Compile Include="IPacketChannelFactory.cs" />
     <Compile Include="IPacketManager.cs" />
     <Compile Include="IPacketBuffer.cs" />
+    <Compile Include="IPublishDispatcher.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="ITopicEvaluator.cs" />
     <Compile Include="netfx\System\AppDomainData.cs" />
     <Compile Include="netfx\System\Collections\Generic\DictionaryGetOrAdd.cs" />
@@ -74,6 +80,9 @@
     <Compile Include="Packets\Disconnect.cs" />
     <Compile Include="Packets\IFlowPacket.cs" />
     <Compile Include="Packets\IPacket.cs" />
+    <Compile Include="Packets\IPublishPacket.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="Packets\PacketType.cs" />
     <Compile Include="Packets\PingRequest.cs" />
     <Compile Include="Packets\PingResponse.cs" />
@@ -103,6 +112,9 @@
     </Compile>
     <Compile Include="TaskRunner.cs" />
     <Compile Include="SingleThreadScheduler.cs" />
+    <Compile Include="PublishDispatcher.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="StoppedEventArgs.cs" />
     <Compile Include="Storage\InMemoryRepositoryProvider.cs" />
     <Compile Include="Storage\IRepositoryProvider.cs" />

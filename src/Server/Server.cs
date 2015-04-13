@@ -21,6 +21,7 @@ namespace Hermes
 		readonly IPacketChannelFactory channelFactory;
 		readonly IProtocolFlowProvider flowProvider;
 		readonly IConnectionProvider connectionProvider;
+                readonly IPublishDispatcher publishDispatcher;
 		readonly IEventStream eventStream;
 		readonly ProtocolConfiguration configuration;
 
@@ -30,6 +31,7 @@ namespace Hermes
 			IPacketChannelFactory channelFactory,
 			IProtocolFlowProvider flowProvider,
 			IConnectionProvider connectionProvider,
+                        IPublishDispatcher publishDispatcher,
 			IEventStream eventStream,
 			ProtocolConfiguration configuration)
 		{
@@ -37,6 +39,7 @@ namespace Hermes
 			this.channelFactory = channelFactory;
 			this.flowProvider = flowProvider;
 			this.connectionProvider = connectionProvider;
+                        this.publishDispatcher = publishDispatcher;
 			this.eventStream = eventStream;
 			this.configuration = configuration;
 		}

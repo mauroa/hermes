@@ -3,7 +3,7 @@ using System.Linq;
 
 namespace Hermes.Packets
 {
-	public class Publish : IPacket, IEquatable<Publish>
+	public class Publish : IPublishPacket, IEquatable<Publish>
     {
         public Publish(string topic, QualityOfService qualityOfService, bool retain, bool duplicated, ushort? packetId = null)
         {
@@ -12,7 +12,10 @@ namespace Hermes.Packets
 			this.Retain = retain;
 			this.Topic = topic;
             this.PacketId = packetId;
+			this.Id = Guid.NewGuid ();
         }
+
+		public Guid Id { get; private set; }
 
 		public PacketType Type { get { return PacketType.Publish; }}
 

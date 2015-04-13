@@ -2,12 +2,15 @@
 
 namespace Hermes.Packets
 {
-	public class PublishComplete : IFlowPacket, IEquatable<PublishComplete>
+	public class PublishComplete : IFlowPacket, IPublishPacket, IEquatable<PublishComplete>
 	{
 		public PublishComplete(ushort packetId)
 		{
 			this.PacketId = packetId;
+			this.Id = Guid.NewGuid ();
 		}
+
+		public Guid Id { get; private set; }
 
 		public PacketType Type { get { return PacketType.PublishComplete; } }
 

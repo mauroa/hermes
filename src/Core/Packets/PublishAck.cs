@@ -2,12 +2,15 @@
 
 namespace Hermes.Packets
 {
-	public class PublishAck : IFlowPacket, IEquatable<PublishAck>
+	public class PublishAck : IFlowPacket, IPublishPacket, IEquatable<PublishAck>
     {
         public PublishAck(ushort packetId)
         {
             this.PacketId = packetId;
+			this.Id = Guid.NewGuid ();
         }
+
+		public Guid Id { get; private set; }
 
 		public PacketType Type { get { return PacketType.PublishAck; }}
 
