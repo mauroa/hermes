@@ -14,6 +14,9 @@ namespace Hermes.Storage
 		T Get (string id);
 
 		/// <exception cref="RepositoryException">RepositoryException</exception>
+		T Get (string id);
+
+		/// <exception cref="RepositoryException">RepositoryException</exception>
         T Get(Expression<Func<T, bool>> predicate);
 
 		/// <exception cref="RepositoryException">RepositoryException</exception>
