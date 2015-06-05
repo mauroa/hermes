@@ -196,20 +196,20 @@ namespace Hermes.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Server - Dispatching {0} message to flow {1} for client {2}.
+        ///   Looks up a localized string similar to Server - Executing flow {0} for message {1} on client {2}.
         /// </summary>
-        internal static string Tracer_ServerPacketListener_DispatchingMessage {
+        internal static string Tracer_ServerPacketListener_ExecutingFlow {
             get {
-                return ResourceManager.GetString("Tracer_ServerPacketListener_DispatchingMessage", resourceCulture);
+                return ResourceManager.GetString("Tracer_ServerPacketListener_ExecutingFlow", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Server - Dispatching Publish message to flow {0} for client {1} and topic {2}.
+        ///   Looks up a localized string similar to Server - Executing flow {0} for publish message on topic {1} and client {2}.
         /// </summary>
-        internal static string Tracer_ServerPacketListener_DispatchingPublish {
+        internal static string Tracer_ServerPacketListener_ExecutingPublishFlow {
             get {
-                return ResourceManager.GetString("Tracer_ServerPacketListener_DispatchingPublish", resourceCulture);
+                return ResourceManager.GetString("Tracer_ServerPacketListener_ExecutingPublishFlow", resourceCulture);
             }
         }
         

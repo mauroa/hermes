@@ -17,8 +17,8 @@ namespace Hermes
 
 		bool disposed;
 		bool isConnected;
+		IDisposable packetsSubscription;
 
-		readonly IDisposable packetsSubscription;
 		readonly ReplaySubject<ApplicationMessage> receiver;
 		readonly ReplaySubject<IPacket> sender;
 		readonly IChannel<IPacket> packetChannel;
@@ -49,24 +49,6 @@ namespace Hermes
 
 			this.packetChannel = channelFactory.Create (binaryChannel);
 			this.packetListener.Listen (this.packetChannel);
-
-			this.packetsSubscription = this.packetListener.Packets
-				.ObserveOn(NewThreadScheduler.Default)
-				.Subscribe (packet => { 
-					if (packet.Type == PacketType.Publish) {
-						var publish = packet as Publish;
-						var message = new ApplicationMessage (publish.Topic, publish.Payload);
-
-						this.receiver.OnNext (message);
-
-						tracer.Info (Resources.Tracer_NewApplicationMessageReceived, this.Id, publish.Topic);
-					}
-				}, ex => {
-					this.Close (ex);
-				}, () => {
-					tracer.Warn (Resources.Tracer_Client_PacketsObservableCompleted);
-					this.Close ();
-				});
 		}
 
 		public event EventHandler<ClosedEventArgs> Closed = (sender, args) => { };
@@ -138,6 +120,7 @@ namespace Hermes
 
 				this.Id = credentials.ClientId;
 				this.IsConnected = true;
+				this.ObservePackets ();
 			} catch(TimeoutException timeEx) {
 				this.Close (timeEx);
 				throw new ClientException (string.Format(Resources.Client_ConnectionTimeout, credentials.ClientId), timeEx);
@@ -386,6 +369,27 @@ namespace Hermes
 			if (this.isConnected && !this.packetChannel.IsConnected) {
 				this.Close (ClosedReason.Error, Resources.Client_UnexpectedChannelDisconnection);
 			}
+		}
+
+		private void ObservePackets ()
+		{
+			this.packetsSubscription = this.packetListener.Packets
+				.ObserveOn(NewThreadScheduler.Default)
+				.Subscribe (packet => { 
+					if (packet.Type == PacketType.Publish) {
+						var publish = packet as Publish;
+						var message = new ApplicationMessage (publish.Topic, publish.Payload);
+
+						this.receiver.OnNext (message);
+
+						tracer.Info (Resources.Tracer_NewApplicationMessageReceived, this.Id, publish.Topic);
+					}
+				}, ex => {
+					this.Close (ex);
+				}, () => {
+					tracer.Warn (Resources.Tracer_Client_PacketsObservableCompleted);
+					this.Close ();
+				});
 		}
 	}
 }

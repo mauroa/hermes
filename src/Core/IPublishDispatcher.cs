@@ -4,9 +4,9 @@ namespace Hermes
 {
 	public interface IPublishDispatcher
 	{
-		void Store (IPublishPacket packet);
+		void Register (IPublishPacket packet);
 
-		void Dispatch (IPublishPacket packet, IChannel<IPacket> channel);
+		void Dispatch (IPublishPacket packet, IChannel<IPacket> channel = null);
 
 		void Discard (IPublishPacket packet);
 	}

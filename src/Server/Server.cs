@@ -21,7 +21,7 @@ namespace Hermes
 		readonly IPacketChannelFactory channelFactory;
 		readonly IProtocolFlowProvider flowProvider;
 		readonly IConnectionProvider connectionProvider;
-                readonly IPublishDispatcher publishDispatcher;
+        readonly IPublishDispatcher publishDispatcher;
 		readonly IEventStream eventStream;
 		readonly ProtocolConfiguration configuration;
 
@@ -31,7 +31,7 @@ namespace Hermes
 			IPacketChannelFactory channelFactory,
 			IProtocolFlowProvider flowProvider,
 			IConnectionProvider connectionProvider,
-                        IPublishDispatcher publishDispatcher,
+            IPublishDispatcher publishDispatcher,
 			IEventStream eventStream,
 			ProtocolConfiguration configuration)
 		{
@@ -39,7 +39,7 @@ namespace Hermes
 			this.channelFactory = channelFactory;
 			this.flowProvider = flowProvider;
 			this.connectionProvider = connectionProvider;
-                        this.publishDispatcher = publishDispatcher;
+            this.publishDispatcher = publishDispatcher;
 			this.eventStream = eventStream;
 			this.configuration = configuration;
 		}
@@ -118,7 +118,8 @@ namespace Hermes
 			tracer.Verbose (Resources.Tracer_Server_NewSocketAccepted);
 
 			var packetChannel = this.channelFactory.Create (binaryChannel);
-			var packetListener = new ServerPacketListener (this.connectionProvider, this.flowProvider, this.configuration);
+			var packetListener = new ServerPacketListener (this.connectionProvider, this.flowProvider, 
+				this.publishDispatcher, this.configuration);
 
 			packetListener.Listen (packetChannel);
 			

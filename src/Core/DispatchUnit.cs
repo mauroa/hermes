@@ -11,7 +11,7 @@ namespace Hermes
 
 		internal IPublishPacket Packet { get; private set; }
 
-		internal bool ReadyToDispatch { get; set; }
+		internal bool Ready { get; set; }
 
 		internal bool Discarded { get; set; }
 

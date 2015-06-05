@@ -54,21 +54,6 @@ namespace IntegrationTests
 		}
 
 		[Fact]
-		public async Task when_subscribe_multiple_topics_then_succeeds()
-		{
-			var client = this.GetClient ();
-			var topicsToSubscribe = 100;
-
-			for (var i = 1; i < topicsToSubscribe; i++) {
-				var topicFilter = string.Format ("test/topic{0}", i);
-
-				await client.SubscribeAsync (topicFilter, QualityOfService.AtMostOnce);
-			}
-
-			Assert.True (client.IsConnected);
-		}
-
-		[Fact]
 		public async Task when_unsubscribe_topic_then_succeeds()
 		{
 			var client = this.GetClient ();

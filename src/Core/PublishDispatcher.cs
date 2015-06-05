@@ -3,52 +3,43 @@ using Hermes.Packets;
 using System.Linq;
 using System;
 using System.Reactive.Linq;
-using System.Timers;
+using System.Reactive.Concurrency;
 
 namespace Hermes
 {
 	public class PublishDispatcher : IPublishDispatcher, IDisposable
 	{
+		readonly IChannel<IPacket> channel;
 		readonly ConcurrentQueue<DispatchUnit> packetQueue;
 		readonly IDisposable packetMonitorSubscription;
 		bool disposed;
 
-		public PublishDispatcher ()
+		public PublishDispatcher (IChannel<IPacket> channel = null)
 		{
-			packetQueue = new ConcurrentQueue<DispatchUnit> ();
-			packetMonitorSubscription = Observable.Create<DispatchUnit> (observer => {
-				var timer = new Timer {
-					Interval = 100
-				};
+			this.channel = channel;
 
-				timer.Elapsed += (sender, args) => {
+			packetQueue = new ConcurrentQueue<DispatchUnit> ();
+			packetMonitorSubscription = Observable
+				.Timer (TimeSpan.FromMilliseconds(100), NewThreadScheduler.Default)
+				.Subscribe(async _=> {
 					var unit = default(DispatchUnit);
 
 					if (packetQueue.TryPeek (out unit)) {
-						if ((unit.ReadyToDispatch || unit.Discarded) && 
+						if ((unit.Ready || unit.Discarded) && 
 							packetQueue.TryDequeue(out unit)) {
-								observer.OnNext (unit);
+								if (unit.Ready) {
+									await unit.Channel.SendAsync (unit.Packet);
+								}
 						}
 					}
-				};
-
-				return () => {
-					timer.Dispose();
-				};
-			})
-			.Subscribe(async unit => {
-				if (unit.ReadyToDispatch) {
-					var channel = unit.Channel;
-
-					await channel.SendAsync (unit.Packet);
-				}
-			});
+				});
 		}
 
-		public void Store(IPublishPacket packet)
+		public void Register(IPublishPacket packet)
 		{
-			if (disposed)
+			if (disposed) {
 				throw new ObjectDisposedException (this.GetType ().FullName);
+			}
 
 			if (packetQueue.Any (u => u.Packet.Id == packet.Id)) {
 				return;
@@ -57,30 +48,36 @@ namespace Hermes
 			packetQueue.Enqueue (new DispatchUnit(packet));
 		}
 
-		public void Dispatch(IPublishPacket packet, IChannel<IPacket> channel)
+		public void Dispatch(IPublishPacket packet, IChannel<IPacket> channel = null)
 		{
-			if (disposed)
+			if (disposed) {
 				throw new ObjectDisposedException (this.GetType ().FullName);
+			}
+
+			if (channel == null && this.channel == null) {
+				throw new ArgumentNullException ("channel");
+			}
 
 			var unit = packetQueue.FirstOrDefault (u => u.Packet.Id == packet.Id);
 
 			if (unit == null) {
 				unit = new DispatchUnit(packet) { 
-					ReadyToDispatch = true,
-					Channel = channel
+					Ready = true,
+					Channel = channel ?? this.channel
 				};
 
 				packetQueue.Enqueue (unit);
 			} else {
-				unit.ReadyToDispatch = true;
-				unit.Channel = channel;
+				unit.Ready = true;
+				unit.Channel = channel ?? this.channel;
 			}
 		}
 
 		public void Discard(IPublishPacket packet)
 		{
-			if (disposed)
+			if (disposed) {
 				throw new ObjectDisposedException (this.GetType ().FullName);
+			}
 
 			var unit = packetQueue.FirstOrDefault (u => u.Packet.Id == packet.Id);
 
@@ -103,6 +100,7 @@ namespace Hermes
 			if (disposed) return;
 
 			packetMonitorSubscription.Dispose ();
+
 			disposed = true;
 		}
 	}

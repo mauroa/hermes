@@ -18,12 +18,16 @@ namespace Hermes.Flows
 	{
 		private static readonly ITracer tracer = Tracer.Get<PublishSenderFlow> ();
 
+		readonly IPublishDispatcher dispatcher;
 		IDictionary<PacketType, Func<string, ushort, IFlowPacket>> senderRules;
 
-		public PublishSenderFlow (IRepository<ClientSession> sessionRepository,
+		public PublishSenderFlow (IPublishDispatcher publishDispatcher,
+			IRepository<ClientSession> sessionRepository,
 			ProtocolConfiguration configuration)
 			: base(sessionRepository, configuration)
 		{
+			this.dispatcher = publishDispatcher;
+
 			this.DefineSenderRules ();
 		}
 
@@ -62,8 +66,7 @@ namespace Hermes.Flows
 				this.SaveMessage (message, clientId, PendingMessageStatus.PendingToAcknowledge);
 			}
 
-			await channel.SendAsync (message)
-				.ConfigureAwait(continueOnCapturedContext: false);
+			this.dispatcher.Dispatch (message, channel);
 
 			if(qos == QualityOfService.AtLeastOnce) {
 				await this.MonitorAckAsync<PublishAck> (message, clientId, channel)

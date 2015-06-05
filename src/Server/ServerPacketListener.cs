@@ -22,10 +22,10 @@ namespace Hermes
 
 		readonly IConnectionProvider connectionProvider;
 		readonly IProtocolFlowProvider flowProvider;
-		readonly IPublishDispatcher publishDispatcher;
+		readonly IPublishDispatcher dispatcher;
 		readonly ProtocolConfiguration configuration;
 		readonly ReplaySubject<IPacket> packets;
-		readonly TaskRunner dispatcher;
+		readonly TaskRunner runner;
 		bool disposed;
 
 		public ServerPacketListener (IConnectionProvider connectionProvider, 
@@ -35,10 +35,10 @@ namespace Hermes
 		{
 			this.connectionProvider = connectionProvider;
 			this.flowProvider = flowProvider;
-			this.publishDispatcher = publishDispatcher;
+			this.dispatcher = publishDispatcher;
 			this.configuration = configuration;
 			this.packets = new ReplaySubject<IPacket> (window: TimeSpan.FromSeconds(configuration.WaitingTimeoutSecs));
-			this.dispatcher = TaskRunner.Get ();
+			this.runner = TaskRunner.Get ();
 		}
 
 		public IObservable<IPacket> Packets { get { return this.packets; } }
@@ -194,25 +194,29 @@ namespace Hermes
 		{
 			var flow = this.flowProvider.GetFlow (packet.Type);
 
-			if (flow != null) {
-				try {
-					this.packets.OnNext (packet);
+			if (flow == null) {
+				return;
+			}
 
-					await this.dispatcher.Run (() => {
-						var publish = packet as Publish;
+			try {
+				this.packets.OnNext (packet);
 
-						if (publish == null) {
-							tracer.Info (Resources.Tracer_ServerPacketListener_DispatchingMessage, packet.Type, flow.GetType().Name, clientId);
-						} else {
-							tracer.Info (Resources.Tracer_ServerPacketListener_DispatchingPublish, flow.GetType().Name, clientId, publish.Topic);
-						}
+				await this.runner.Run (() => {
+					var publish = packet as Publish;
 
-						return flow.ExecuteAsync (clientId, packet, channel);
-					})
-					.ConfigureAwait(continueOnCapturedContext: false);
-				} catch (Exception ex) {
-					this.NotifyError (ex, clientId);
-				}
+					if (publish == null) {
+						tracer.Info (Resources.Tracer_ServerPacketListener_ExecutingFlow, flow.GetType().Name, packet.Type, clientId);
+					} else {
+						tracer.Info (Resources.Tracer_ServerPacketListener_ExecutingPublishFlow, flow.GetType().Name, publish.Topic, clientId);
+
+						this.dispatcher.Register (publish);
+					}
+
+					return flow.ExecuteAsync (clientId, packet, channel);
+				})
+				.ConfigureAwait(continueOnCapturedContext: false);
+			} catch (Exception ex) {
+				this.NotifyError (ex, clientId);
 			}
 		}
 
