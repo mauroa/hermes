@@ -21,9 +21,9 @@ namespace System.Net.Mqtt
 			this.formatters = formatters.ToDictionary(f => f.PacketType);
 		}
 
-		/// <exception cref="MqttConnectionException">ConnectProtocolException</exception>
-		/// <exception cref="MqttViolationException">ProtocolViolationException</exception>
-		/// <exception cref="MqttException">ProtocolException</exception>
+		/// <exception cref="MqttConnectionException">MqttConnectionException</exception>
+		/// <exception cref="MqttViolationException">MqttViolationException</exception>
+		/// <exception cref="MqttException">MqttException</exception>
 		public async Task<IPacket> GetPacketAsync (byte[] bytes)
 		{
 			var packetType = (PacketType)bytes.Byte (0).Bits (4);
@@ -38,9 +38,9 @@ namespace System.Net.Mqtt
 			return packet;
 		}
 
-		/// <exception cref="MqttConnectionException">ConnectProtocolException</exception>
-		/// <exception cref="MqttViolationException">ProtocolViolationException</exception>
-		/// <exception cref="MqttException">ProtocolException</exception>
+		/// <exception cref="MqttConnectionException">MqttConnectionException</exception>
+		/// <exception cref="MqttViolationException">MqttViolationException</exception>
+		/// <exception cref="MqttException">MqttException</exception>
 		public async Task<byte[]> GetBytesAsync (IPacket packet)
 		{
 			var formatter = default (IFormatter);

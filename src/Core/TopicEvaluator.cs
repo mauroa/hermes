@@ -52,7 +52,7 @@ namespace System.Net.Mqtt
 				!topicName.Contains ("+");
 		}
 
-		/// <exception cref="MqttException">ProtocolException</exception>
+		/// <exception cref="MqttException">MqttException</exception>
 		public bool Matches (string topicName, string topicFilter)
 		{
 			if (!this.IsValidTopicName (topicName)) { 

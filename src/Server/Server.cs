@@ -47,7 +47,7 @@ namespace System.Net.Mqtt.Server
 
 		public IEnumerable<string> ActiveClients { get { return this.connectionProvider.ActiveClients; } }
 
-		/// <exception cref="ProtocolException">ProtocolException</exception>
+		/// <exception cref="MqttException">MqttException</exception>
 		/// <exception cref="ObjectDisposedException">ObjectDisposedException</exception>
 		public void Start()
 		{

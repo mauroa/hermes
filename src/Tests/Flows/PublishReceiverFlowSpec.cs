@@ -164,7 +164,7 @@ namespace Tests.Flows
 				.Setup (p => p.GetConnection (It.Is<string> (s => s == subscribedClientId)))
 				.Returns (clientChannel.Object);
 
-			var packetId = (ushort?)new Random ().Next (0, ushort.MaxValue);
+			var packetId = (ushort)new Random ().Next (0, ushort.MaxValue);
 			var publish = new Publish (topic, QualityOfService.AtLeastOnce, retain: false, duplicated: false, packetId: packetId);
 
 			publish.Payload = Encoding.UTF8.GetBytes ("Publish Flow Test");
@@ -184,7 +184,7 @@ namespace Tests.Flows
 					p.Payload.ToList().SequenceEqual(publish.Payload)),
 				It.Is<IChannel<IPacket>>(c => c == clientChannel.Object), It.Is<PendingMessageStatus>(x => x == PendingMessageStatus.PendingToSend)));
 			channel.Verify (c => c.SendAsync (It.Is<IPacket> (p => p is PublishAck && 
-				(p as PublishAck).PacketId == packetId.Value)));
+				(p as PublishAck).PacketId == packetId)));
 		}
 
 		[Fact]
@@ -209,7 +209,7 @@ namespace Tests.Flows
 					PendingMessages = new List<PendingMessage> { new PendingMessage() }
 				});
 
-			var packetId = (ushort?)new Random ().Next (0, ushort.MaxValue);
+			var packetId = (ushort)new Random ().Next (0, ushort.MaxValue);
 			var packetIdProvider = Mock.Of<IPacketIdProvider> ();
 			var eventStream = new EventStream ();
 
@@ -268,7 +268,7 @@ namespace Tests.Flows
 
 			var ackSent = ackSentSignal.Wait (1000);
 
-			receiver.OnNext (new PublishRelease (packetId.Value));
+			receiver.OnNext (new PublishRelease (packetId));
 
 			Thread.Sleep (1000);
 
@@ -278,7 +278,7 @@ namespace Tests.Flows
 					p.Payload.ToList().SequenceEqual(publish.Payload)),
 				It.Is<IChannel<IPacket>>(c => c == clientChannel.Object), It.Is<PendingMessageStatus>(x => x == PendingMessageStatus.PendingToSend)));
 			retainedRepository.Verify (r => r.Create (It.IsAny<RetainedMessage> ()), Times.Never);
-			channelMock.Verify (c => c.SendAsync (It.Is<IPacket> (p => p is PublishReceived && (p as PublishReceived).PacketId == packetId.Value)));
+			channelMock.Verify (c => c.SendAsync (It.Is<IPacket> (p => p is PublishReceived && (p as PublishReceived).PacketId == packetId)));
 		}
 
 		[Fact]
@@ -329,7 +329,7 @@ namespace Tests.Flows
 			topicEvaluator.Setup (e => e.Matches (It.IsAny<string> (), It.IsAny<string> ())).Returns (true);
 			sessionRepository.Setup (r => r.GetAll (It.IsAny<Expression<Func<ClientSession, bool>>>())).Returns ( sessions.AsQueryable());
 
-			var packetId = (ushort?)new Random ().Next (0, ushort.MaxValue);
+			var packetId = (ushort)new Random ().Next (0, ushort.MaxValue);
 			var publish = new Publish (topic, QualityOfService.ExactlyOnce, retain: false, duplicated: false, packetId: packetId);
 
 			publish.Payload = Encoding.UTF8.GetBytes ("Publish Receiver Flow Test");
@@ -519,7 +519,7 @@ namespace Tests.Flows
 				.Setup (p => p.GetConnection (It.Is<string> (s => s == subscribedClientId)))
 				.Returns (clientChannel.Object);
 
-			var packetId = (ushort?)new Random ().Next (0, ushort.MaxValue);
+			var packetId = (ushort)new Random ().Next (0, ushort.MaxValue);
 			var publish = new Publish (topic, QualityOfService.ExactlyOnce, retain: false, duplicated: false, packetId: packetId);
 
 			publish.Payload = Encoding.UTF8.GetBytes ("Publish Flow Test");
@@ -538,7 +538,7 @@ namespace Tests.Flows
 					p.Payload.ToList().SequenceEqual(publish.Payload)),
 				It.Is<IChannel<IPacket>>(c => c == clientChannel.Object), It.Is<PendingMessageStatus>(x => x == PendingMessageStatus.PendingToSend)));
 			retainedRepository.Verify(r => r.Create (It.IsAny<RetainedMessage> ()), Times.Never);
-			channel.Verify (c => c.SendAsync (It.Is<IPacket> (p => p is PublishAck && (p as PublishAck).PacketId == packetId.Value)));
+			channel.Verify (c => c.SendAsync (It.Is<IPacket> (p => p is PublishAck && (p as PublishAck).PacketId == packetId)));
 		}
 		
 		[Fact]
@@ -632,7 +632,7 @@ namespace Tests.Flows
 			var clientChannel = new Mock<IChannel<IPacket>> ();
 
 			clientSender.OfType<Publish>().Subscribe (p => {
-				clientReceiver.OnNext (new PublishAck (p.PacketId.Value));
+				clientReceiver.OnNext (new PublishAck (p.PacketId));
 			});
 
 			clientChannel.Setup (c => c.Receiver).Returns (clientReceiver);
@@ -647,7 +647,7 @@ namespace Tests.Flows
 				.Setup (p => p.GetConnection (It.Is<string> (s => s == subscribedClientId)))
 				.Returns (clientChannel.Object);
 
-			var packetId = (ushort?)new Random ().Next (0, ushort.MaxValue);
+			var packetId = (ushort)new Random ().Next (0, ushort.MaxValue);
 			var publish = new Publish (topic, QualityOfService.ExactlyOnce, retain: false, duplicated: false, packetId: packetId);
 
 			publish.Payload = Encoding.UTF8.GetBytes ("Publish Receiver Flow Test");
@@ -712,7 +712,7 @@ namespace Tests.Flows
 			var clientChannel = new Mock<IChannel<IPacket>> ();
 
 			clientSender.OfType<Publish>().Subscribe (p => {
-				clientReceiver.OnNext (new PublishReceived (p.PacketId.Value));
+				clientReceiver.OnNext (new PublishReceived (p.PacketId));
 			});
 
 			clientChannel.Setup (c => c.Receiver).Returns (clientReceiver);
@@ -727,7 +727,7 @@ namespace Tests.Flows
 				.Setup (p => p.GetConnection (It.Is<string> (s => s == subscribedClientId)))
 				.Returns (clientChannel.Object);
 
-			var packetId = (ushort?)new Random ().Next (0, ushort.MaxValue);
+			var packetId = (ushort)new Random ().Next (0, ushort.MaxValue);
 			var publish = new Publish (topic, QualityOfService.ExactlyOnce, retain: false, duplicated: false, packetId: packetId);
 
 			publish.Payload = Encoding.UTF8.GetBytes ("Publish Receiver Flow Test");

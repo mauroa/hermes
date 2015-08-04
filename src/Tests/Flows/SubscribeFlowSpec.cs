@@ -197,7 +197,7 @@ namespace Tests.Flows
 			var configuration = new ProtocolConfiguration { MaximumQualityOfService = QualityOfService.AtLeastOnce };
 			var topicEvaluator = new Mock<ITopicEvaluator> ();
 			var sessionRepository = new Mock<IRepository<ClientSession>> ();
-			var packetIdProvider = Mock.Of<IPacketIdProvider> ();
+			var packetIdProvider = Mock.Of<IPacketIdProvider> (p => p.GetPacketId() == 1);
 			var retainedMessageRepository = new Mock<IRepository<RetainedMessage>> ();
 			var senderFlow = new Mock<IPublishSenderFlow> ();
 
@@ -247,7 +247,7 @@ namespace Tests.Flows
 				It.Is<Publish> (p => p.Topic == retainedTopic && 
 					p.QualityOfService == fooQoS && 
 					p.Payload.ToList().SequenceEqual(retainedPayload) && 
-					p.PacketId.HasValue && 
+					p.PacketId == 1 && 
 					p.Retain), 
 				It.Is<IChannel<IPacket>>(c => c == channel.Object),
 				It.Is<PendingMessageStatus>(x => x == PendingMessageStatus.PendingToSend)));

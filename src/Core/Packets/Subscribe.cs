@@ -3,7 +3,7 @@ using System.Linq;
 
 namespace System.Net.Mqtt.Packets
 {
-	internal class Subscribe : IFlowPacket, IEquatable<Subscribe>
+	internal class Subscribe : IIdentifiablePacket, IEquatable<Subscribe>
     {
         public Subscribe(ushort packetId, params Subscription[] subscriptions)
         {
@@ -13,7 +13,7 @@ namespace System.Net.Mqtt.Packets
 
 		public PacketType Type { get { return PacketType.Subscribe; }}
 
-        public ushort PacketId { get; private set; }
+		public ushort PacketId { get; private set; }
 
         public IEnumerable<Subscription> Subscriptions { get; private set; }
 

@@ -94,7 +94,7 @@ namespace System.Net.Mqtt.Flows
 		private async Task SendPendingAcknowledgementsAsync(ClientSession session, IChannel<IPacket> channel)
 		{
 			foreach (var pendingAcknowledgement in session.GetPendingAcknowledgements()) {
-				var ack = default(IFlowPacket);
+				var ack = default(IIdentifiablePacket);
 
 				if (pendingAcknowledgement.Type == PacketType.PublishReceived)
 					ack = new PublishReceived (pendingAcknowledgement.PacketId);

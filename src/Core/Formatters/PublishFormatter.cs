@@ -44,7 +44,7 @@ namespace System.Net.Mqtt.Formatters
 			}
 
 			var variableHeaderLength = topic.Length + 2;
-			var packetId = default (ushort?);
+			var packetId = default (ushort);
 
 			if (qos != QualityOfService.AtMostOnce) {
 				packetId = bytes.Bytes (nextIndex, 2).ToUInt16 ();
@@ -111,10 +111,10 @@ namespace System.Net.Mqtt.Formatters
 			if (!this.topicEvaluator.IsValidTopicName (packet.Topic))
 				throw new MqttException (Properties.Resources.PublishFormatter_InvalidTopicName);
 
-			if (packet.PacketId.HasValue && packet.QualityOfService == QualityOfService.AtMostOnce)
+			if (packet.PacketId != default(ushort) && packet.QualityOfService == QualityOfService.AtMostOnce)
 					throw new MqttException (Properties.Resources.PublishFormatter_InvalidPacketId);
 
-			if(!packet.PacketId.HasValue && packet.QualityOfService != QualityOfService.AtMostOnce)
+			if(packet.PacketId == default(ushort) && packet.QualityOfService != QualityOfService.AtMostOnce)
 				throw new MqttException (Properties.Resources.PublishFormatter_PacketIdRequired);
 
 			var variableHeader = new List<byte> ();
@@ -123,8 +123,8 @@ namespace System.Net.Mqtt.Formatters
 
 			variableHeader.AddRange (topicBytes);
 
-			if (packet.PacketId.HasValue) {
-				var packetIdBytes = Protocol.Encoding.EncodeInteger(packet.PacketId.Value);
+			if (packet.PacketId != default(ushort)) {
+				var packetIdBytes = Protocol.Encoding.EncodeInteger(packet.PacketId);
 
 				variableHeader.AddRange (packetIdBytes);
 			}

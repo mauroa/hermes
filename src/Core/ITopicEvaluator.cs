@@ -6,7 +6,7 @@
 
 		bool IsValidTopicName (string topicName);
 
-		/// <exception cref="ProtocolException">ProtocolException</exception>
+		/// <exception cref="MqttException">MqttException</exception>
 		bool Matches (string topicName, string topicFilter);
 	}
 }

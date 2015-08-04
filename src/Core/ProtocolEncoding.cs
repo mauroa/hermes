@@ -6,7 +6,7 @@ namespace System.Net.Mqtt
 {
 	public class ProtocolEncoding
 	{
-		/// <exception cref="MqttException">ProtocolException</exception>
+		/// <exception cref="MqttException">MqttException</exception>
 		public byte[] EncodeString (string text)
 		{
 			if (string.IsNullOrEmpty (text)) {
@@ -29,7 +29,7 @@ namespace System.Net.Mqtt
 			return bytes.ToArray();
 		}
 
-		/// <exception cref="MqttException">ProtocolException</exception>
+		/// <exception cref="MqttException">MqttException</exception>
 		public byte[] EncodeInteger(int number)
 		{
 			if(number > Protocol.MaxIntegerLength){
@@ -69,7 +69,7 @@ namespace System.Net.Mqtt
 			return bytes.ToArray();
 		}
 
-		/// <exception cref="MqttException">ProtocolException</exception>
+		/// <exception cref="MqttException">MqttException</exception>
 		public int DecodeRemainingLength(byte[] packet, out int arrayLength)
 		{
 			var multiplier = 1;

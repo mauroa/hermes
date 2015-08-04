@@ -187,7 +187,7 @@ namespace System.Net.Mqtt.Client
 			}
 
 			try {
-				ushort? packetId = qos == QualityOfService.AtMostOnce ? null : (ushort?)this.packetIdProvider.GetPacketId ();
+				var packetId = qos == QualityOfService.AtMostOnce ? default(ushort) : this.packetIdProvider.GetPacketId ();
 				var publish = new Publish (message.Topic, qos, retain, duplicated: false, packetId: packetId)
 				{
 					Payload = message.Payload

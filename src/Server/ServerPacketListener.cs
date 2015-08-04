@@ -221,17 +221,17 @@ namespace System.Net.Mqtt.Server
 
 				await this.flowRunner.Run (async () => {
 					if (packet.Type == PacketType.Publish) {
-							var publish = packet as Publish;
+						var publish = packet as Publish;
 
-							tracer.Info (Properties.Resources.Tracer_ServerPacketListener_DispatchingPublish, flow.GetType().Name, clientId, publish.Topic);
-						} else if (packet.Type == PacketType.Subscribe) {
-							var subscribe = packet as Subscribe;
-							var topics = subscribe.Subscriptions == null ? new List<string> () : subscribe.Subscriptions.Select (s => s.TopicFilter);
+						tracer.Info (Properties.Resources.Tracer_ServerPacketListener_DispatchingPublish, flow.GetType().Name, clientId, publish.Topic);
+					} else if (packet.Type == PacketType.Subscribe) {
+						var subscribe = packet as Subscribe;
+						var topics = subscribe.Subscriptions == null ? new List<string> () : subscribe.Subscriptions.Select (s => s.TopicFilter);
 
-							tracer.Info (Properties.Resources.Tracer_ServerPacketListener_DispatchingSubscribe, flow.GetType().Name, clientId, string.Join(", ", topics));
-						} else {
-							tracer.Info (Properties.Resources.Tracer_ServerPacketListener_DispatchingMessage, packet.Type, flow.GetType().Name, clientId);
-						}
+						tracer.Info (Properties.Resources.Tracer_ServerPacketListener_DispatchingSubscribe, flow.GetType().Name, clientId, string.Join(", ", topics));
+					} else {
+						tracer.Info (Properties.Resources.Tracer_ServerPacketListener_DispatchingMessage, packet.Type, flow.GetType().Name, clientId);
+					}
 
 					await flow.ExecuteAsync (this.clientId, packet, this.channel)
 						.ConfigureAwait(continueOnCapturedContext: false);

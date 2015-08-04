@@ -27,7 +27,7 @@ namespace System.Net.Mqtt.Flows
 
 		protected abstract bool IsValidPacketType (PacketType packetType);
 
-		/// <exception cref="MqttException">ProtocolException</exception>
+		/// <exception cref="MqttException">MqttException</exception>
 		public IProtocolFlow GetFlow (PacketType packetType)
 		{
 			if (!this.IsValidPacketType (packetType)) {

@@ -102,7 +102,7 @@ namespace System.Net.Mqtt.Flows
 			var requestedQos = isWill ? publish.QualityOfService : subscription.MaximumQualityOfService;
 			var supportedQos = configuration.GetSupportedQos(requestedQos);
 			var retain = isWill ? publish.Retain : false;
-			ushort? packetId = supportedQos == QualityOfService.AtMostOnce ? null : (ushort?)this.packetIdProvider.GetPacketId ();
+			var packetId = supportedQos == QualityOfService.AtMostOnce ? default(ushort) : this.packetIdProvider.GetPacketId ();
 			var subscriptionPublish = new Publish (publish.Topic, supportedQos, retain, duplicated: false, packetId: packetId) {
 				Payload = publish.Payload
 			};

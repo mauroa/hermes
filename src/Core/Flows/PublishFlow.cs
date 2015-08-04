@@ -25,7 +25,7 @@ namespace System.Net.Mqtt.Flows
 
 		public abstract Task ExecuteAsync (string clientId, IPacket input, IChannel<IPacket> channel);
 
-		public async Task SendAckAsync (string clientId, IFlowPacket ack, IChannel<IPacket> channel, PendingMessageStatus status = PendingMessageStatus.PendingToSend)
+		public async Task SendAckAsync (string clientId, IIdentifiablePacket ack, IChannel<IPacket> channel, PendingMessageStatus status = PendingMessageStatus.PendingToSend)
 		{
 			if((ack.Type == PacketType.PublishReceived || ack.Type == PacketType.PublishRelease) &&
 				status == PendingMessageStatus.PendingToSend) {
@@ -65,8 +65,8 @@ namespace System.Net.Mqtt.Flows
 			this.sessionRepository.Update (session);
 		}
 
-		protected async Task MonitorAckAsync<T>(IFlowPacket sentMessage, string clientId, IChannel<IPacket> channel)
-			where T : IFlowPacket
+		protected async Task MonitorAckAsync<T>(IIdentifiablePacket sentMessage, string clientId, IChannel<IPacket> channel)
+			where T : IIdentifiablePacket
 		{
 			var intervalSubscription = Observable
 				.Interval (TimeSpan.FromSeconds (this.configuration.WaitingTimeoutSecs), NewThreadScheduler.Default)
@@ -86,7 +86,7 @@ namespace System.Net.Mqtt.Flows
 			intervalSubscription.Dispose ();
 		}
 
-		private void SavePendingAcknowledgement(IFlowPacket ack, string clientId)
+		private void SavePendingAcknowledgement(IIdentifiablePacket ack, string clientId)
 		{
 			if (ack.Type != PacketType.PublishReceived && ack.Type != PacketType.PublishRelease) {
 				return;

@@ -43,11 +43,11 @@ namespace System.Net.Mqtt.Flows
 
 		private async Task HandlePublishAsync(string clientId, Publish publish, IChannel<IPacket> channel)
 		{
-			if (publish.QualityOfService != QualityOfService.AtMostOnce && !publish.PacketId.HasValue) {
+			if (publish.QualityOfService != QualityOfService.AtMostOnce && publish.PacketId ==  default(ushort)) {
 				throw new MqttException (Properties.Resources.PublishReceiverFlow_PacketIdRequired);
 			}
 
-			if (publish.QualityOfService == QualityOfService.AtMostOnce && publish.PacketId.HasValue) {
+			if (publish.QualityOfService == QualityOfService.AtMostOnce && publish.PacketId != default(ushort)) {
 				throw new MqttException (Properties.Resources.PublishReceiverFlow_PacketIdNotAllowed);
 			}
 			
@@ -58,7 +58,7 @@ namespace System.Net.Mqtt.Flows
 				throw new MqttException (string.Format(Properties.Resources.SessionRepository_ClientSessionNotFound, clientId));
 			}
 
-			if(qos == QualityOfService.ExactlyOnce && session.GetPendingAcknowledgements().Any(ack => ack.Type == PacketType.PublishReceived && ack.PacketId == publish.PacketId.Value)) {
+			if(qos == QualityOfService.ExactlyOnce && session.GetPendingAcknowledgements().Any(ack => ack.Type == PacketType.PublishReceived && ack.PacketId == publish.PacketId)) {
 				await this.SendQosAck (clientId, qos, publish, channel)
 					.ConfigureAwait(continueOnCapturedContext: false);
 
@@ -84,10 +84,10 @@ namespace System.Net.Mqtt.Flows
 			if (qos == QualityOfService.AtMostOnce) {
 				return;
 			} else if (qos == QualityOfService.AtLeastOnce) {
-				await this.SendAckAsync (clientId, new PublishAck (publish.PacketId.Value), channel)
+				await this.SendAckAsync (clientId, new PublishAck (publish.PacketId), channel)
 					.ConfigureAwait(continueOnCapturedContext: false);
 			} else {
-				await this.SendAckAsync (clientId, new PublishReceived (publish.PacketId.Value), channel)
+				await this.SendAckAsync (clientId, new PublishReceived (publish.PacketId), channel)
 					.ConfigureAwait(continueOnCapturedContext: false);
 			}
 		}

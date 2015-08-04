@@ -35,7 +35,7 @@ namespace Tests.Flows
 			var flow = new PublishSenderFlow (sessionRepository.Object, configuration);
 
 			var topic = "foo/bar";
-			var packetId = (ushort?)new Random ().Next (0, ushort.MaxValue);
+			var packetId = (ushort)new Random ().Next (0, ushort.MaxValue);
 			var publish = new Publish (topic, QualityOfService.AtLeastOnce, retain: false, duplicated: false, packetId: packetId);
 
 			publish.Payload = Encoding.UTF8.GetBytes ("Publish Receiver Flow Test");
@@ -95,7 +95,7 @@ namespace Tests.Flows
 			var flow = new PublishSenderFlow (sessionRepository.Object, configuration);
 
 			var topic = "foo/bar";
-			var packetId = (ushort?)new Random ().Next (0, ushort.MaxValue);
+			var packetId = (ushort)new Random ().Next (0, ushort.MaxValue);
 			var publish = new Publish (topic, QualityOfService.ExactlyOnce, retain: false, duplicated: false, packetId: packetId);
 
 			publish.Payload = Encoding.UTF8.GetBytes ("Publish Receiver Flow Test");

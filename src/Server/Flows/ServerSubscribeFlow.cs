@@ -102,8 +102,8 @@ namespace System.Net.Mqtt.Flows
 
 			if (retainedMessages != null) {
 				foreach (var retainedMessage in retainedMessages) {
-					ushort? packetId = subscription.MaximumQualityOfService == QualityOfService.AtMostOnce ?
-						null : (ushort?)this.packetIdProvider.GetPacketId ();
+					var packetId = subscription.MaximumQualityOfService == QualityOfService.AtMostOnce ?
+						default(ushort) : this.packetIdProvider.GetPacketId ();
 					var publish = new Publish (retainedMessage.Topic, subscription.MaximumQualityOfService, 
 						retain: true, duplicated: false, packetId: packetId) {
 						Payload = retainedMessage.Payload

@@ -32,7 +32,7 @@ namespace System.Net.Mqtt.Server
 			});
 		}
 
-		/// <exception cref="MqttException">ProtocolException</exception>
+		/// <exception cref="MqttException">MqttException</exception>
 		public IObservable<IChannel<byte[]>> GetChannels ()
 		{
 			if (this.disposed) {

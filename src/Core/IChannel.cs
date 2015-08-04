@@ -10,7 +10,7 @@ namespace System.Net.Mqtt
 
 		IObservable<T> Sender { get; }
 
-		/// <exception cref="ProtocolException">ProtocolException</exception>
+		/// <exception cref="MqttException">MqttException</exception>
         Task SendAsync(T message);
     }
 }

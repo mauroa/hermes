@@ -3,7 +3,7 @@
 namespace System.Net.Mqtt.Formatters
 {
 	internal class FlowPacketFormatter<T> : Formatter<T>
-		where T : class, IFlowPacket
+		where T : class, IIdentifiablePacket
 	{
 		readonly PacketType packetType;
 		readonly Func<ushort, T> packetFactory;
