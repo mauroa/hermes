@@ -2,18 +2,26 @@
 
 namespace System.Net.Mqtt.Packets
 {
-	internal class Publish : IPacket, IEquatable<Publish>
+	internal class Publish : IIdentifiablePacket, IDispatchUnit, IEquatable<Publish>
     {
-        public Publish(string topic, QualityOfService qualityOfService, bool retain, bool duplicated, ushort? packetId = null)
+        public Publish(string topic, QualityOfService qualityOfService, bool retain, bool duplicated, ushort packetId = default(ushort))
+			: this(topic, qualityOfService, retain, duplicated, packetId, Guid.NewGuid())
+        {
+        }
+
+		internal Publish(string topic, QualityOfService qualityOfService, bool retain, bool duplicated, ushort packetId, Guid dispatchId)
         {
             this.QualityOfService = qualityOfService;
 			this.Duplicated = duplicated;
 			this.Retain = retain;
 			this.Topic = topic;
             this.PacketId = packetId;
+			this.DispatchId = dispatchId;
         }
 
 		public PacketType Type { get { return PacketType.Publish; }}
+
+		public ushort PacketId { get; private set; }
 
 		public QualityOfService QualityOfService { get; private set; }
 
@@ -23,9 +31,9 @@ namespace System.Net.Mqtt.Packets
 
         public string Topic { get; private set; }
 
-        public ushort? PacketId { get; private set; }
-
 		public byte[] Payload { get; set; }
+
+		public Guid DispatchId { get; private set; }
 
 		public bool Equals (Publish other)
 		{
@@ -85,8 +93,8 @@ namespace System.Net.Mqtt.Packets
 				hashCode += BitConverter.ToString (this.Payload).GetHashCode ();
 			}
 
-			if (this.PacketId.HasValue) {
-				hashCode += this.PacketId.Value.GetHashCode ();
+			if (this.PacketId != default(ushort)) {
+				hashCode += this.PacketId.GetHashCode ();
 			}
 
 			return hashCode;

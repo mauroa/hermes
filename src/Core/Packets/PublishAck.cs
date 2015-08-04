@@ -1,15 +1,22 @@
 ﻿namespace System.Net.Mqtt.Packets
 {
-	internal class PublishAck : IFlowPacket, IEquatable<PublishAck>
+	internal class PublishAck : IIdentifiablePacket, IDispatchUnit, IEquatable<PublishAck>
     {
-        public PublishAck(ushort packetId)
+        public PublishAck(ushort packetId) : this(packetId, Guid.NewGuid())
         {
-            this.PacketId = packetId;
         }
+
+		internal PublishAck(ushort packetId, Guid dispatchId)
+		{
+			this.PacketId = packetId;
+			this.DispatchId = dispatchId;
+		}
 
 		public PacketType Type { get { return PacketType.PublishAck; }}
 
-        public ushort PacketId { get; private set; }
+		public ushort PacketId { get; private set; }
+
+		public Guid DispatchId { get; private set; }
 
 		public bool Equals (PublishAck other)
 		{

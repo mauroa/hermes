@@ -1,15 +1,22 @@
 ﻿namespace System.Net.Mqtt.Packets
 {
-	internal class PublishReceived : IFlowPacket, IEquatable<PublishReceived>
+	internal class PublishReceived : IIdentifiablePacket, IDispatchUnit, IEquatable<PublishReceived>
 	{
-		public PublishReceived(ushort packetId)
+		public PublishReceived(ushort packetId) : this(packetId, Guid.NewGuid())
+        {
+        }
+
+		internal PublishReceived(ushort packetId, Guid dispatchId)
 		{
 			this.PacketId = packetId;
+			this.DispatchId = dispatchId;
 		}
 
 		public PacketType Type { get { return PacketType.PublishReceived; } }
 
 		public ushort PacketId { get; private set; }
+
+		public Guid DispatchId { get; private set; }
 
 		public bool Equals(PublishReceived other)
 		{
