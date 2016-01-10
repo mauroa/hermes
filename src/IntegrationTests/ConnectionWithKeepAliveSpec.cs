@@ -10,11 +10,11 @@ using System.Net.Mqtt.Client;
 
 namespace IntegrationTests
 {
-	public class ConnectionSpecWithKeepAlive : IntegrationContext, IDisposable
+	public class ConnectionWithKeepAliveSpec : IntegrationContext, IDisposable
 	{
 		readonly Server server;
 
-		public ConnectionSpecWithKeepAlive () 
+		public ConnectionWithKeepAliveSpec () 
 			: base(keepAliveSecs: 1)
 		{
 			this.server = this.GetServer ();

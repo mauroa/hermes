@@ -7,6 +7,7 @@ using System.Net.Mqtt.Packets;
 using System.Net.Mqtt.Storage;
 using System.Net.Mqtt.Server;
 using Props = System.Net.Mqtt.Server.Properties;
+using System.Net.Mqtt.Ordering;
 
 namespace System.Net.Mqtt.Flows
 {
@@ -15,21 +16,22 @@ namespace System.Net.Mqtt.Flows
 		static readonly ITracer tracer = Tracer.Get<ServerPublishReceiverFlow> ();
 
 		readonly IConnectionProvider connectionProvider;
-		readonly IPublishSenderFlow senderFlow;
+		readonly IServerPublishSenderFlow senderFlow;
 		readonly IRepository<ConnectionWill> willRepository;
 		readonly IPacketIdProvider packetIdProvider;
 		readonly IEventStream eventStream;
 
 		public ServerPublishReceiverFlow (ITopicEvaluator topicEvaluator,
+			IPacketDispatcherProvider dispatcherProvider,
 			IConnectionProvider connectionProvider,
-			IPublishSenderFlow senderFlow,
+			IServerPublishSenderFlow senderFlow,
 			IRepository<RetainedMessage> retainedRepository, 
 			IRepository<ClientSession> sessionRepository,
 			IRepository<ConnectionWill> willRepository,
 			IPacketIdProvider packetIdProvider,
 			IEventStream eventStream,
 			ProtocolConfiguration configuration)
-			: base(topicEvaluator, retainedRepository, sessionRepository, configuration)
+			: base(topicEvaluator, dispatcherProvider, retainedRepository, sessionRepository, configuration)
 		{
 			this.connectionProvider = connectionProvider;
 			this.senderFlow = senderFlow;
@@ -58,7 +60,7 @@ namespace System.Net.Mqtt.Flows
 				}
 			}
 
-			await this.DispatchAsync (publish, clientId)
+			await this.ForwardPublishAsync (publish, clientId)
 				.ConfigureAwait(continueOnCapturedContext: false);
 		}
 
@@ -73,43 +75,27 @@ namespace System.Net.Mqtt.Flows
 
 				tracer.Info (Props.Resources.Tracer_ServerPublishReceiverFlow_SendingWill, clientId, willPublish.Topic);
 
-				await this.DispatchAsync(willPublish, clientId, isWill: true)
+				await this.ForwardPublishAsync(willPublish, clientId, isWill: true)
 					.ConfigureAwait(continueOnCapturedContext: false);
 			}
 		}
 
-		private async Task DispatchAsync (Publish publish, string clientId, bool isWill = false)
+		private async Task ForwardPublishAsync (Publish publish, string clientId, bool isWill = false)
 		{
 			var subscriptions = this.sessionRepository
 				.GetAll ().ToList ()
 				.SelectMany (s => s.GetSubscriptions ())
 				.Where (x => this.topicEvaluator.Matches (publish.Topic, x.TopicFilter));
 
-			if (!subscriptions.Any ()) {
+			if (subscriptions.Any ()) {
+				await this.senderFlow.ForwardPublishAsync (subscriptions, publish, isWill)
+					.ConfigureAwait(continueOnCapturedContext: false);
+			} else {
 				tracer.Verbose (Props.Resources.Tracer_ServerPublishReceiverFlow_TopicNotSubscribed, publish.Topic, clientId);
 
 				this.eventStream.Push (new TopicNotSubscribed { Topic = publish.Topic, SenderId = clientId, Payload = publish.Payload });
-			} else {
-				foreach (var subscription in subscriptions) {
-					await this.DispatchAsync (publish, subscription, isWill)
-						.ConfigureAwait(continueOnCapturedContext: false);
-				}
+				this.dispatcherProvider.Get ().Complete (publish.DispatchId);
 			}
-		}
-
-		private async Task DispatchAsync (Publish publish, ClientSubscription subscription, bool isWill = false)
-		{
-			var requestedQos = isWill ? publish.QualityOfService : subscription.MaximumQualityOfService;
-			var supportedQos = configuration.GetSupportedQos(requestedQos);
-			var retain = isWill ? publish.Retain : false;
-			var packetId = supportedQos == QualityOfService.AtMostOnce ? default(ushort) : this.packetIdProvider.GetPacketId ();
-			var subscriptionPublish = new Publish (publish.Topic, supportedQos, retain, duplicated: false, packetId: packetId) {
-				Payload = publish.Payload
-			};
-			var clientChannel = this.connectionProvider.GetConnection (subscription.ClientId);
-
-			await this.senderFlow.SendPublishAsync (subscription.ClientId, subscriptionPublish, clientChannel)
-				.ConfigureAwait(continueOnCapturedContext: false);
 		}
 	}
 }

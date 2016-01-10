@@ -8,6 +8,7 @@ using System.Net.Mqtt.Packets;
 using Moq;
 using Xunit;
 using System.Net.Mqtt.Server;
+using System.Net.Mqtt.Ordering;
 
 namespace Tests
 {
@@ -43,7 +44,8 @@ namespace Tests
 			var connectionProvider = new Mock<IConnectionProvider> ();
 			var eventStream = new EventStream ();
 
-			var server = new Server (channelProvider.Object, factory, flowProvider, connectionProvider.Object, eventStream, configuration);
+			var server = new Server (channelProvider.Object, factory, flowProvider, connectionProvider.Object, 
+				Mock.Of<IPacketDispatcherProvider>(), eventStream, configuration);
 
 			sockets.OnNext (Mock.Of<IChannel<byte[]>> (x => x.Receiver == new Subject<byte[]> ()));
 			sockets.OnNext (Mock.Of<IChannel<byte[]>> (x => x.Receiver == new Subject<byte[]> ()));
@@ -82,7 +84,8 @@ namespace Tests
 			var connectionProvider = new Mock<IConnectionProvider> ();
 			var eventStream = new EventStream ();
 
-			var server = new Server (channelProvider.Object, factory, flowProvider, connectionProvider.Object, eventStream, configuration);
+			var server = new Server (channelProvider.Object, factory, flowProvider, connectionProvider.Object, 
+				Mock.Of<IPacketDispatcherProvider>(), eventStream, configuration);
 
 			server.Start ();
 
@@ -122,7 +125,7 @@ namespace Tests
 			var eventStream = new EventStream ();
 
 			var server = new Server (channelProvider.Object, Mock.Of<IPacketChannelFactory> (x => x.Create (It.IsAny<IChannel<byte[]>> ()) == packetChannel.Object), 
-				flowProvider, connectionProvider.Object, eventStream, configuration);
+				flowProvider, connectionProvider.Object, Mock.Of<IPacketDispatcherProvider>(), eventStream, configuration);
 
 			server.Start ();
 
@@ -169,7 +172,8 @@ namespace Tests
 			var connectionProvider = new Mock<IConnectionProvider> ();
 			var eventStream = new EventStream ();
 
-			var server = new Server (channelProvider.Object, factory.Object, flowProvider, connectionProvider.Object, eventStream, configuration);
+			var server = new Server (channelProvider.Object, factory.Object, flowProvider, 
+				connectionProvider.Object, Mock.Of<IPacketDispatcherProvider>(), eventStream, configuration);
 			var receiver = new Subject<byte[]> ();
 			var socket = new Mock<IChannel<byte[]>> ();
 

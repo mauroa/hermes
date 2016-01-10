@@ -280,6 +280,57 @@ namespace IntegrationTests
 			client3.Close ();
 		}
 
+		[Fact]
+		public async Task when_connect_client_with_same_client_id_then_new_client_is_preserved()
+		{
+			var clientId = this.GetClientId ();
+			var client1 = this.GetClient ();
+			var client2 = this.GetClient ();
+
+			await client1.ConnectAsync (new ClientCredentials (clientId))
+				.ConfigureAwait(continueOnCapturedContext: false);
+			await client2.ConnectAsync (new ClientCredentials (clientId))
+				.ConfigureAwait(continueOnCapturedContext: false);
+
+			//var existClientAfterConnect = server.ActiveClients.Any (c => c == clientId);
+
+			//await client.DisconnectAsync ()
+			//	.ConfigureAwait(continueOnCapturedContext: false);
+
+			//var clientClosed = new ManualResetEventSlim ();
+
+			//var subscription = Observable.Create<bool> (observer => {
+			//	var timer = new System.Timers.Timer();
+
+			//	timer.Interval = 200;
+			//	timer.Elapsed += (sender, args) => {
+			//		if (server.ActiveClients.Any (c => c == clientId)) {
+			//			observer.OnNext (false);
+			//		} else {
+			//			observer.OnNext (true);
+			//			clientClosed.Set ();
+			//			observer.OnCompleted ();
+			//		}
+			//	};
+			//	timer.Start();
+
+			//	return () => {
+			//		timer.Dispose();
+			//	};
+			//})
+			//.Subscribe (
+			//	_ => { },
+			//	ex => { Console.WriteLine (string.Format ("Error: {0}", ex.Message)); });
+
+			//var clientDisconnected = clientClosed.Wait (2000);
+
+			//Assert.True (existClientAfterConnect);
+			//Assert.True (clientDisconnected);
+			//Assert.False (server.ActiveClients.Any (c => c == clientId));
+
+			//client.Close ();
+		}
+
 		public void Dispose ()
 		{
 			if (this.server != null) {

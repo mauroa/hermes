@@ -1,5 +1,6 @@
 ﻿using System.Net.Mqtt.Diagnostics;
 using System.Net.Mqtt.Flows;
+using System.Net.Mqtt.Ordering;
 using System.Net.Mqtt.Storage;
 
 namespace System.Net.Mqtt.Client
@@ -29,10 +30,11 @@ namespace System.Net.Mqtt.Client
 					topicEvaluator, configuration);
 				var packetIdProvider = new PacketIdProvider ();
 				var repositoryProvider = new InMemoryRepositoryProvider();
-				var flowProvider = new ClientProtocolFlowProvider(topicEvaluator, repositoryProvider, configuration);
+				var dispatcherProvider = new PacketDispatcherProvider ();
+				var flowProvider = new ClientProtocolFlowProvider(topicEvaluator, dispatcherProvider, repositoryProvider, configuration);
 				var packetChannel = channelFactory.Create ();
 
-				return new Client (packetChannel, flowProvider, repositoryProvider, packetIdProvider, configuration);
+				return new Client (packetChannel, flowProvider, dispatcherProvider, repositoryProvider, packetIdProvider, configuration);
 			} catch (Exception ex) {
 				tracer.Error (ex, Properties.Resources.Client_InitializeError);
 

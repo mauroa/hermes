@@ -8,6 +8,8 @@ using System.Net.Mqtt.Storage;
 using Moq;
 using Xunit;
 using System.Net.Mqtt.Server;
+using System.Net.Mqtt.Ordering;
+using System.Reactive.Linq;
 
 namespace Tests
 {
@@ -31,7 +33,31 @@ namespace Tests
 			packetChannel.Setup (c => c.Receiver).Returns (receiver);
 			packetChannel.Setup (c => c.Sender).Returns (new Subject<IPacket> ());
 
-			var listener = new ServerPacketListener (packetChannel.Object, connectionProvider.Object, flowProvider.Object, configuration);
+			var dispatcher = new Mock<IPacketDispatcher> ();
+			var dispatcherProvider = new Mock<IPacketDispatcherProvider> ();
+
+			dispatcher
+				.Setup (d => d.DispatchAsync (It.IsAny<IDispatchUnit> (), It.IsAny<IChannel<IPacket>> ()))
+				.Callback<IDispatchUnit, IChannel<IPacket>> (async (u, c) => {
+					await c.SendAsync (u);
+				});
+			dispatcherProvider
+				.Setup (p => p.Get (It.IsAny<string> ()))
+				.Returns (dispatcher.Object);
+			dispatcherProvider
+				.Setup (p => p.Get ())
+				.Returns (dispatcher.Object);
+
+			var listener = new ServerPacketListener (packetChannel.Object, connectionProvider.Object, 
+				dispatcherProvider.Object, flowProvider.Object, configuration);
+
+			var signal = new ManualResetEventSlim ();
+
+			var flowExecutedCount = 0;
+
+			flow.Setup (f => f.ExecuteAsync (It.IsAny<string> (), It.IsAny<IPacket> (), It.IsAny<IChannel<IPacket>> ()))
+				.Callback (() => flowExecutedCount++)
+				.Returns (System.Threading.Tasks.Task.Delay (0));
 
 			listener.Listen ();
 
@@ -42,26 +68,13 @@ namespace Tests
 			receiver.OnNext (connect);
 			receiver.OnNext (publish);
 
-			var connectReceived = false;
-			var publishReceived = false;
-			var signal = new ManualResetEventSlim ();
+			var flowsExecuted = SpinWait.SpinUntil (() => flowExecutedCount == 2, millisecondsTimeout: 2000);
 
-			listener.Packets.Subscribe (p => {
-				if (p is Connect) {
-					connectReceived = true;
-				} else if (p is Publish) {
-					publishReceived = true;
-				}
+			Assert.True (flowsExecuted);
 
-				if (connectReceived && publishReceived) {
-					signal.Set ();
-				}
-			});
-
-			var signalSet = signal.Wait (1000);
-
-			Assert.True (signalSet);
-
+			dispatcherProvider.Verify (p => p.Get ());
+			dispatcherProvider.Verify (p => p.Get (It.Is<string>(s => s == clientId)));
+			dispatcher.Verify (d => d.Register (It.Is<Guid> (g => g == publish.DispatchId)));
 			flowProvider.Verify (p => p.GetFlow (It.Is<PacketType> (t => t == PacketType.Publish)));
 			flow.Verify (f => f.ExecuteAsync (It.Is<string> (s => s == clientId), It.Is<IPacket> (p => p is Connect), It.Is<IChannel<IPacket>>(c => c == packetChannel.Object)));
 			flow.Verify (f => f.ExecuteAsync (It.Is<string> (s => s == clientId), It.Is<IPacket> (p => p is Publish), It.Is<IChannel<IPacket>>(c => c == packetChannel.Object)));
@@ -80,7 +93,8 @@ namespace Tests
 			packetChannel.Setup (c => c.Receiver).Returns (receiver);
 			packetChannel.Setup (c => c.Sender).Returns (new Subject<IPacket> ());
 
-			var listener = new ServerPacketListener (packetChannel.Object, connectionProvider.Object, flowProvider, configuration);
+			var listener = new ServerPacketListener (packetChannel.Object, connectionProvider.Object, 
+				Mock.Of<IPacketDispatcherProvider>(), flowProvider, configuration);
 
 			listener.Listen ();
 
@@ -106,7 +120,8 @@ namespace Tests
 			packetChannel.Setup (c => c.Receiver).Returns (receiver);
 			packetChannel.Setup (c => c.Sender).Returns (new Subject<IPacket> ());
 
-			var listener = new ServerPacketListener (packetChannel.Object, connectionProvider.Object, flowProvider, configuration);
+			var listener = new ServerPacketListener (packetChannel.Object, connectionProvider.Object, 
+				Mock.Of<IPacketDispatcherProvider>(), flowProvider, configuration);
 
 			listener.Listen ();
 
@@ -135,7 +150,8 @@ namespace Tests
 			packetChannel.Setup (c => c.Receiver).Returns (receiver);
 			packetChannel.Setup (c => c.Sender).Returns (new Subject<IPacket> ());
 
-			var listener = new ServerPacketListener (packetChannel.Object, connectionProvider.Object, flowProvider, configuration);
+			var listener = new ServerPacketListener (packetChannel.Object, connectionProvider.Object, 
+				Mock.Of<IPacketDispatcherProvider>(), flowProvider, configuration);
 
 			listener.Listen ();
 			
@@ -166,7 +182,8 @@ namespace Tests
 			packetChannel.Setup (c => c.Receiver).Returns (receiver);
 			packetChannel.Setup (c => c.Sender).Returns (new Subject<IPacket> ());
 
-			var listener = new ServerPacketListener (packetChannel.Object, connectionProvider.Object, flowProvider, configuration);
+			var listener = new ServerPacketListener (packetChannel.Object, connectionProvider.Object, 
+				Mock.Of<IPacketDispatcherProvider>(), flowProvider, configuration);
 
 			listener.Listen ();
 			
@@ -196,7 +213,8 @@ namespace Tests
 			packetChannel.Setup (c => c.Receiver).Returns (receiver);
 			packetChannel.Setup (c => c.Sender).Returns (new Subject<IPacket> ());
 
-			var listener = new ServerPacketListener (packetChannel.Object, connectionProvider.Object, flowProvider, configuration);
+			var listener = new ServerPacketListener (packetChannel.Object, connectionProvider.Object, 
+				Mock.Of<IPacketDispatcherProvider>(), flowProvider, configuration);
 
 			listener.Listen ();
 			
@@ -237,7 +255,8 @@ namespace Tests
 
 			var packetChannel = packetChannelMock.Object;
 
-			var listener = new ServerPacketListener (packetChannel, connectionProvider.Object, flowProvider.Object, configuration);
+			var listener = new ServerPacketListener (packetChannel, connectionProvider.Object, 
+				Mock.Of<IPacketDispatcherProvider>(), flowProvider.Object, configuration);
 
 			listener.Listen ();
 
@@ -279,7 +298,8 @@ namespace Tests
 			packetChannel.Setup (c => c.Receiver).Returns (receiver);
 			packetChannel.Setup (c => c.Sender).Returns (new Subject<IPacket> ());
 
-			var listener = new ServerPacketListener (packetChannel.Object, connectionProvider.Object, flowProvider.Object, configuration);
+			var listener = new ServerPacketListener (packetChannel.Object, connectionProvider.Object, 
+				Mock.Of<IPacketDispatcherProvider>(), flowProvider.Object, configuration);
 
 			listener.Listen ();
 			
@@ -317,7 +337,8 @@ namespace Tests
 			packetChannel.Setup (c => c.Receiver).Returns (receiver);
 			packetChannel.Setup (c => c.Sender).Returns (new Subject<IPacket> ());
 
-			var listener = new ServerPacketListener (packetChannel.Object, connectionProvider.Object, flowProvider.Object, configuration);
+			var listener = new ServerPacketListener (packetChannel.Object, connectionProvider.Object, 
+				Mock.Of<IPacketDispatcherProvider>(), flowProvider.Object, configuration);
 
 			listener.Listen ();
 

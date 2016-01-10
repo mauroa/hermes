@@ -7,6 +7,7 @@ using System.Net.Mqtt.Diagnostics;
 using System.Net.Mqtt.Packets;
 using System.Net.Mqtt.Storage;
 using System.Net.Mqtt.Exceptions;
+using System.Net.Mqtt.Ordering;
 
 namespace System.Net.Mqtt.Flows
 {
@@ -14,32 +15,37 @@ namespace System.Net.Mqtt.Flows
 	{
 		private static readonly ITracer tracer = Tracer.Get<PublishSenderFlow> ();
 
-		IDictionary<PacketType, Func<string, ushort, IIdentifiablePacket>> senderRules;
+		IDictionary<PacketType, Func<string, IDispatchUnit, IDispatchUnit>> senderRules;
 
-		public PublishSenderFlow (IRepository<ClientSession> sessionRepository,
+		public PublishSenderFlow (IPacketDispatcherProvider dispatcherProvider,
+			IRepository<ClientSession> sessionRepository,
 			ProtocolConfiguration configuration)
-			: base(sessionRepository, configuration)
+			: base(dispatcherProvider, sessionRepository, configuration)
 		{
 			this.DefineSenderRules ();
 		}
 
 		public override async Task ExecuteAsync (string clientId, IPacket input, IChannel<IPacket> channel)
 		{
-			var senderRule = default (Func<string, ushort, IIdentifiablePacket>);
+			var senderRule = default (Func<string, IDispatchUnit, IDispatchUnit>);
 
 			if (!this.senderRules.TryGetValue (input.Type, out senderRule)) {
 				return;
 			}
 
-			var flowPacket = input as IIdentifiablePacket;
+			var unit = input as IDispatchUnit;
 
-			if (flowPacket == null) {
+			if (unit == null) {
 				return;
 			}
 
-			var ackPacket = senderRule (clientId, flowPacket.PacketId);
+			var ackPacket = senderRule (clientId, unit);
 
-			if (ackPacket != default(IIdentifiablePacket)) {
+			if (ackPacket == default (IDispatchUnit)) {
+				this.dispatcherProvider
+					.Get (clientId)
+					.Complete (unit.DispatchId);
+			} else {
 				await this.SendAckAsync (clientId, ackPacket, channel)
 					.ConfigureAwait(continueOnCapturedContext: false);
 			}
@@ -58,8 +64,8 @@ namespace System.Net.Mqtt.Flows
 				this.SaveMessage (message, clientId, PendingMessageStatus.PendingToAcknowledge);
 			}
 
-			await channel.SendAsync (message)
-				.ConfigureAwait(continueOnCapturedContext: false);
+			await this.DispatchAsync (clientId, message, channel)
+				.FirstOrDefaultAsync(item => item.Unit.PacketId == message.PacketId);
 
 			if(qos == QualityOfService.AtLeastOnce) {
 				await this.MonitorAckAsync<PublishAck> (message, clientId, channel)
@@ -71,9 +77,21 @@ namespace System.Net.Mqtt.Flows
 					.OfType<PublishComplete> ()
 					.FirstOrDefaultAsync (x => x.PacketId == message.PacketId);
 			}
+
+			this.CompleteDispatch (clientId, message);
 		}
 
-		protected void RemovePendingMessage(string clientId, ushort packetId)
+		protected virtual IObservable<DispatchOrderItem> DispatchAsync(string clientId, Publish message, IChannel<IPacket> channel)
+		{
+			return this.dispatcherProvider.Get (clientId).DispatchAsync (message, channel);
+		}
+
+		protected virtual void CompleteDispatch(string clientId, Publish message)
+		{
+			this.dispatcherProvider.Get (clientId).Complete (message.DispatchId);
+		}
+
+		protected void RemovePendingMessage(string clientId, IDispatchUnit unit)
 		{
 			var session = this.sessionRepository.Get (s => s.ClientId == clientId);
 
@@ -83,7 +101,7 @@ namespace System.Net.Mqtt.Flows
 
 			var pendingMessage = session
 				.GetPendingMessages()
-				.FirstOrDefault(p => p.PacketId == packetId);
+				.FirstOrDefault(p => p.PacketId == unit.PacketId);
 
 			session.RemovePendingMessage (pendingMessage);
 
@@ -95,16 +113,16 @@ namespace System.Net.Mqtt.Flows
 		{
 			var intervalSubscription = Observable
 				.Interval (TimeSpan.FromSeconds (this.configuration.WaitingTimeoutSecs), NewThreadScheduler.Default)
-				.Subscribe (async _ => {
+				.Subscribe (_ => {
 					if (channel.IsConnected) {
 						tracer.Warn (Properties.Resources.Tracer_PublishFlow_RetryingQoSFlow, sentMessage.Type, clientId);
 
 						var duplicated = new Publish (sentMessage.Topic, sentMessage.QualityOfService,
-							sentMessage.Retain, duplicated: true, packetId: sentMessage.PacketId) {
+							sentMessage.Retain, duplicated: true, packetId: sentMessage.PacketId, dispatchId: sentMessage.DispatchId) {
 								Payload = sentMessage.Payload
 							};
 
-						await channel.SendAsync (duplicated);
+						this.DispatchAsync (clientId, duplicated, channel);
 					}
 				});
 			
@@ -118,24 +136,24 @@ namespace System.Net.Mqtt.Flows
 
 		private void DefineSenderRules ()
 		{
-			this.senderRules = new Dictionary<PacketType, Func<string, ushort, IIdentifiablePacket>> ();
+			this.senderRules = new Dictionary<PacketType, Func<string, IDispatchUnit, IDispatchUnit>> ();
 
-			this.senderRules.Add (PacketType.PublishAck, (clientId, packetId) => {
-				this.RemovePendingMessage (clientId, packetId);
+			this.senderRules.Add (PacketType.PublishAck, (clientId, unit) => {
+				this.RemovePendingMessage (clientId, unit);
 
-				return default (IIdentifiablePacket);
+				return default (IDispatchUnit);
 			});
 
-			this.senderRules.Add (PacketType.PublishReceived, (clientId, packetId) => {
-				this.RemovePendingMessage (clientId, packetId);
+			this.senderRules.Add (PacketType.PublishReceived, (clientId, unit) => {
+				this.RemovePendingMessage (clientId, unit);
 
-				return new PublishRelease(packetId);
+				return new PublishRelease(unit.PacketId, unit.DispatchId);
 			});
 
-			this.senderRules.Add (PacketType.PublishComplete, (clientId, packetId) => {
-				this.RemovePendingAcknowledgement (clientId, packetId, PacketType.PublishRelease);
+			this.senderRules.Add (PacketType.PublishComplete, (clientId, unit) => {
+				this.RemovePendingAcknowledgement (clientId, unit, PacketType.PublishRelease);
 
-				return default (IIdentifiablePacket);
+				return default (IDispatchUnit);
 			});
 		}
 

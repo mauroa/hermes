@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Net.Mqtt.Diagnostics;
 using System.Net.Mqtt.Flows;
+using System.Net.Mqtt.Ordering;
 using System.Net.Mqtt.Packets;
 using System.Reactive;
 
@@ -19,6 +20,7 @@ namespace System.Net.Mqtt.Server
 		readonly IPacketChannelFactory channelFactory;
 		readonly IProtocolFlowProvider flowProvider;
 		readonly IConnectionProvider connectionProvider;
+		readonly IPacketDispatcherProvider dispatcherProvider;
 		readonly IEventStream eventStream;
 		readonly ProtocolConfiguration configuration;
 
@@ -28,6 +30,7 @@ namespace System.Net.Mqtt.Server
 			IPacketChannelFactory channelFactory,
 			IProtocolFlowProvider flowProvider,
 			IConnectionProvider connectionProvider,
+			IPacketDispatcherProvider dispatcherProvider,
 			IEventStream eventStream,
 			ProtocolConfiguration configuration)
 		{
@@ -35,6 +38,7 @@ namespace System.Net.Mqtt.Server
 			this.channelFactory = channelFactory;
 			this.flowProvider = flowProvider;
 			this.connectionProvider = connectionProvider;
+			this.dispatcherProvider = dispatcherProvider;
 			this.eventStream = eventStream;
 			this.configuration = configuration;
 		}
@@ -90,6 +94,8 @@ namespace System.Net.Mqtt.Server
 					this.streamSubscription.Dispose ();
 				}
 
+				this.dispatcherProvider.Dispose ();
+
 				foreach (var channel in channels) {
 					channel.Dispose ();
 				}
@@ -118,7 +124,8 @@ namespace System.Net.Mqtt.Server
 			tracer.Verbose (Properties.Resources.Tracer_Server_NewSocketAccepted);
 
 			var packetChannel = this.channelFactory.Create (binaryChannel);
-			var packetListener = new ServerPacketListener (packetChannel, this.connectionProvider, this.flowProvider, this.configuration);
+			var packetListener = new ServerPacketListener (packetChannel, this.connectionProvider, 
+				this.dispatcherProvider, this.flowProvider, this.configuration);
 
 			packetListener.Listen ();
 			packetListener.Packets.Subscribe (_ => {}, ex => { 

@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System.Net.Mqtt.Diagnostics;
 using System.Net.Mqtt.Packets;
 using System.Net.Mqtt.Exceptions;
+using System.Net.Mqtt.Ordering;
 
 namespace System.Net.Mqtt
 {
@@ -14,14 +15,16 @@ namespace System.Net.Mqtt
 
 		readonly IChannel<byte[]> innerChannel;
 		readonly IPacketManager manager;
+		readonly IPacketDispatcher dispatcher;
 		readonly ReplaySubject<IPacket> receiver;
 		readonly ReplaySubject<IPacket> sender;
 		readonly IDisposable subscription;
 
-		public PacketChannel (IChannel<byte[]> innerChannel, IPacketManager manager, ProtocolConfiguration configuration)
+		public PacketChannel (IChannel<byte[]> innerChannel, IPacketManager manager, IPacketDispatcher dispatcher, ProtocolConfiguration configuration)
 		{
 			this.innerChannel = innerChannel;
 			this.manager = manager;
+			this.dispatcher = dispatcher;
 
 			this.receiver = new ReplaySubject<IPacket> (window: TimeSpan.FromSeconds (configuration.WaitingTimeoutSecs));
 			this.sender = new ReplaySubject<IPacket> (window: TimeSpan.FromSeconds (configuration.WaitingTimeoutSecs));
@@ -30,6 +33,11 @@ namespace System.Net.Mqtt
 					try {
 						var packet = await this.manager.GetPacketAsync (bytes)
 							.ConfigureAwait(continueOnCapturedContext: false);
+						var dispatchUnit = packet as IDispatchUnit;
+
+						if (dispatchUnit != null) {
+							this.dispatcher.Register (dispatchUnit.DispatchId);
+						}
 
 						this.receiver.OnNext (packet);
 					} catch (MqttException ex) {

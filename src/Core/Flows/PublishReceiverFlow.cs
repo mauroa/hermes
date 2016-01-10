@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System.Net.Mqtt.Packets;
 using System.Net.Mqtt.Storage;
 using System.Net.Mqtt.Exceptions;
+using System.Net.Mqtt.Ordering;
 
 namespace System.Net.Mqtt.Flows
 {
@@ -12,10 +13,11 @@ namespace System.Net.Mqtt.Flows
 		protected readonly IRepository<RetainedMessage> retainedRepository;
 
 		public PublishReceiverFlow (ITopicEvaluator topicEvaluator,
+			IPacketDispatcherProvider dispatcherProvider,
 			IRepository<RetainedMessage> retainedRepository, 
 			IRepository<ClientSession> sessionRepository,
 			ProtocolConfiguration configuration)
-			: base(sessionRepository, configuration)
+			: base(dispatcherProvider, sessionRepository, configuration)
 		{
 			this.topicEvaluator = topicEvaluator;
 			this.retainedRepository = retainedRepository;
@@ -73,21 +75,22 @@ namespace System.Net.Mqtt.Flows
 
 		private async Task HandlePublishReleaseAsync(string clientId, PublishRelease publishRelease, IChannel<IPacket> channel)
 		{
-			this.RemovePendingAcknowledgement (clientId, publishRelease.PacketId, PacketType.PublishReceived);
+			this.RemovePendingAcknowledgement (clientId, publishRelease, PacketType.PublishReceived);
 
-			await this.SendAckAsync (clientId, new PublishComplete (publishRelease.PacketId), channel)
+			await this.SendAckAsync (clientId, new PublishComplete (publishRelease.PacketId, publishRelease.DispatchId), channel)
 				.ConfigureAwait(continueOnCapturedContext: false);
 		}
 
 		private async Task SendQosAck(string clientId, QualityOfService qos, Publish publish, IChannel<IPacket> channel)
 		{
 			if (qos == QualityOfService.AtMostOnce) {
+				this.dispatcherProvider.Get (clientId).Complete (publish.DispatchId);
 				return;
 			} else if (qos == QualityOfService.AtLeastOnce) {
-				await this.SendAckAsync (clientId, new PublishAck (publish.PacketId), channel)
+				await this.SendAckAsync (clientId, new PublishAck (publish.PacketId, publish.DispatchId), channel)
 					.ConfigureAwait(continueOnCapturedContext: false);
 			} else {
-				await this.SendAckAsync (clientId, new PublishReceived (publish.PacketId), channel)
+				await this.SendAckAsync (clientId, new PublishReceived (publish.PacketId, publish.DispatchId), channel)
 					.ConfigureAwait(continueOnCapturedContext: false);
 			}
 		}

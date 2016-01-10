@@ -24,7 +24,7 @@
       <Link>Properties\GlobalAssemblyInfo.cs</Link>
     </Compile>
     <Compile Include="ByteExtensions.cs" />
-    <Compile Include="DispatchOrder.cs" />
+    <Compile Include="Ordering\DispatchOrder.cs" />
     <Compile Include="Exceptions\RepositoryException.cs" />
     <Compile Include="Extensions.cs" />
     <Compile Include="External\Diagnostics\Tracer\ITracer.cs" />
@@ -50,16 +50,20 @@
     <Compile Include="Formatters\Formatter.cs" />
     <Compile Include="Formatters\IFormatter.cs" />
     <Compile Include="Formatters\EmptyPacketFormatter.cs" />
-    <Compile Include="Formatters\FlowPacketFormatter.cs" />
+    <Compile Include="Formatters\IdentifiablePacketFormatter.cs" />
     <Compile Include="Formatters\PublishFormatter.cs" />
     <Compile Include="Formatters\SubscribeAckFormatter.cs" />
     <Compile Include="Formatters\UnsubscribeFormatter.cs" />
     <Compile Include="Formatters\SubscribeFormatter.cs" />
     <Compile Include="IChannel.cs" />
     <Compile Include="IChannelFactory.cs" />
+    <Compile Include="Ordering\DispatchOrderItem.cs" />
+    <Compile Include="Ordering\DispatchState.cs" />
+    <Compile Include="Ordering\IPacketDispatcherProvider.cs" />
+    <Compile Include="Ordering\PacketDispatcherProvider.cs" />
     <Compile Include="Packets\IDispatchUnit.cs" />
     <Compile Include="IInitalizer.cs" />
-    <Compile Include="IPacketDispatcher.cs" />
+    <Compile Include="Ordering\IPacketDispatcher.cs" />
     <Compile Include="IPacketIdProvider.cs" />
     <Compile Include="IPacketListener.cs" />
     <Compile Include="IPacketChannelFactory.cs" />
@@ -70,7 +74,7 @@
     <Compile Include="netfx\System\Collections\Generic\DictionaryGetOrAdd.cs" />
     <Compile Include="PacketChannel.cs" />
     <Compile Include="PacketChannelFactory.cs" />
-    <Compile Include="PacketDispatcher.cs" />
+    <Compile Include="Ordering\PacketDispatcher.cs" />
     <Compile Include="PacketIdProvider.cs" />
     <Compile Include="PacketManager.cs" />
     <Compile Include="PacketBuffer.cs" />

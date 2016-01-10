@@ -50,6 +50,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Flows\ServerPublishSenderFlowSpec.cs" />
+    <Compile Include="PacketDispatcherSpec.cs" />
     <Compile Include="PacketIdProviderSpec.cs" />
     <Compile Include="PacketProcessorSpec.cs" />
     <Compile Include="ByteExtensionsSpec.cs" />

@@ -7,6 +7,7 @@ using System.Net.Mqtt.Flows;
 using System.Net.Mqtt.Packets;
 using System.Net.Mqtt.Storage;
 using System.Net.Mqtt.Exceptions;
+using System.Net.Mqtt.Ordering;
 
 namespace System.Net.Mqtt.Client
 {
@@ -23,6 +24,7 @@ namespace System.Net.Mqtt.Client
 		readonly ReplaySubject<IPacket> sender;
 		readonly IChannel<IPacket> packetChannel;
 		readonly IProtocolFlowProvider flowProvider;
+		readonly IPacketDispatcherProvider dispatcherProvider;
 		readonly IRepository<ClientSession> sessionRepository;
 		readonly IPacketIdProvider packetIdProvider;
 		readonly ProtocolConfiguration configuration;
@@ -31,6 +33,7 @@ namespace System.Net.Mqtt.Client
 
         internal Client(IChannel<IPacket> packetChannel, 
 			IProtocolFlowProvider flowProvider,
+			IPacketDispatcherProvider dispatcherProvider,
 			IRepositoryProvider repositoryProvider,
 			IPacketIdProvider packetIdProvider,
 			ProtocolConfiguration configuration)
@@ -40,11 +43,12 @@ namespace System.Net.Mqtt.Client
 
 			this.packetChannel = packetChannel;
 			this.flowProvider = flowProvider;
+			this.dispatcherProvider = dispatcherProvider;
 			this.sessionRepository = repositoryProvider.GetRepository<ClientSession>();
 			this.packetIdProvider = packetIdProvider;
 			this.configuration = configuration;
 			this.clientSender = TaskRunner.Get("ClientSender");
-			this.packetListener = new ClientPacketListener (packetChannel, flowProvider, configuration);
+			this.packetListener = new ClientPacketListener (packetChannel, flowProvider, dispatcherProvider, configuration);
 
 			this.packetListener.Listen ();
 		}
@@ -297,6 +301,7 @@ namespace System.Net.Mqtt.Client
 				}
 				
 				this.packetListener.Dispose ();
+				this.dispatcherProvider.Dispose ();
 				this.packetChannel.Dispose ();
 				this.IsConnected = false; 
 				this.Id = null;

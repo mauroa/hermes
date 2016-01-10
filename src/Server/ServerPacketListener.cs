@@ -1,5 +1,4 @@
-﻿using System.Reactive.Concurrency;
-using System.Reactive.Disposables;
+﻿using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Threading.Tasks;
@@ -9,6 +8,7 @@ using System.Net.Mqtt.Packets;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Mqtt.Exceptions;
+using System.Net.Mqtt.Ordering;
 
 namespace System.Net.Mqtt.Server
 {
@@ -18,6 +18,7 @@ namespace System.Net.Mqtt.Server
 
 		readonly IChannel<IPacket> channel;
 		readonly IConnectionProvider connectionProvider;
+		readonly IPacketDispatcherProvider dispatcherProvider;
 		readonly IProtocolFlowProvider flowProvider;
 		readonly ProtocolConfiguration configuration;
 		readonly ReplaySubject<IPacket> packets;
@@ -29,11 +30,13 @@ namespace System.Net.Mqtt.Server
 
 		public ServerPacketListener (IChannel<IPacket> channel,
 			IConnectionProvider connectionProvider, 
+			IPacketDispatcherProvider dispatcherProvider,
 			IProtocolFlowProvider flowProvider,
 			ProtocolConfiguration configuration)
 		{
 			this.channel = channel;
 			this.connectionProvider = connectionProvider;
+			this.dispatcherProvider = dispatcherProvider;
 			this.flowProvider = flowProvider;
 			this.configuration = configuration;
 			this.packets = new ReplaySubject<IPacket> (window: TimeSpan.FromSeconds(configuration.WaitingTimeoutSecs));
@@ -72,6 +75,7 @@ namespace System.Net.Mqtt.Server
 
 				this.disposable.Dispose ();
 				this.packets.OnCompleted ();
+				this.dispatcherProvider.Dispose ();
 				this.disposed = true;
 			}
 		}
@@ -101,7 +105,7 @@ namespace System.Net.Mqtt.Server
 
 					tracer.Info (Properties.Resources.Tracer_ServerPacketListener_ConnectPacketReceived, this.clientId);
 
-					await this.DispatchPacketAsync (connect)
+					await this.ExecuteFlowAsync (connect)
 						.ConfigureAwait(continueOnCapturedContext: false);
 				}, async ex => {
 					await this.HandleConnectionExceptionAsync (ex)
@@ -119,7 +123,9 @@ namespace System.Net.Mqtt.Server
 						return;
 					}
 
-					await this.DispatchPacketAsync (packet)
+					this.RegisterForDispatch (packet);
+
+					await this.ExecuteFlowAsync (packet)
 						.ConfigureAwait(continueOnCapturedContext: false);
 				}, ex => {
 					this.NotifyError (ex);
@@ -208,7 +214,26 @@ namespace System.Net.Mqtt.Server
 			return TimeSpan.FromSeconds (tolerance);
 		}
 
-		private async Task DispatchPacketAsync(IPacket packet)
+		private void RegisterForDispatch (IPacket packet)
+		{
+			var dispatchUnit = packet as IDispatchUnit;
+
+			if (dispatchUnit != null) {
+				this.dispatcherProvider
+					.Get (this.clientId)
+					.Register (dispatchUnit.DispatchId);
+			}
+
+			var publish = packet as Publish;
+
+			if(publish != null) {
+				this.dispatcherProvider
+					.Get ()
+					.Register (publish.DispatchId);
+			}
+		}
+
+		private async Task ExecuteFlowAsync(IPacket packet)
 		{
 			var flow = this.flowProvider.GetFlow (packet.Type);
 
@@ -217,22 +242,10 @@ namespace System.Net.Mqtt.Server
 			}
 			
 			try {
+				this.TraceExecution (packet, flow);
 				this.packets.OnNext (packet);
 
 				await this.flowRunner.Run (async () => {
-					if (packet.Type == PacketType.Publish) {
-						var publish = packet as Publish;
-
-						tracer.Info (Properties.Resources.Tracer_ServerPacketListener_DispatchingPublish, flow.GetType().Name, clientId, publish.Topic);
-					} else if (packet.Type == PacketType.Subscribe) {
-						var subscribe = packet as Subscribe;
-						var topics = subscribe.Subscriptions == null ? new List<string> () : subscribe.Subscriptions.Select (s => s.TopicFilter);
-
-						tracer.Info (Properties.Resources.Tracer_ServerPacketListener_DispatchingSubscribe, flow.GetType().Name, clientId, string.Join(", ", topics));
-					} else {
-						tracer.Info (Properties.Resources.Tracer_ServerPacketListener_DispatchingMessage, packet.Type, flow.GetType().Name, clientId);
-					}
-
 					await flow.ExecuteAsync (this.clientId, packet, this.channel)
 						.ConfigureAwait(continueOnCapturedContext: false);
 				})
@@ -243,6 +256,22 @@ namespace System.Net.Mqtt.Server
 				} else {
 					this.NotifyError (ex);
 				}
+			}
+		}
+
+		private void TraceExecution(IPacket packet, IProtocolFlow flow)
+		{
+			if (packet.Type == PacketType.Publish) {
+				var publish = packet as Publish;
+
+				tracer.Info (Properties.Resources.Tracer_ServerPacketListener_DispatchingPublish, flow.GetType().Name, clientId, publish.Topic);
+			} else if (packet.Type == PacketType.Subscribe) {
+				var subscribe = packet as Subscribe;
+				var topics = subscribe.Subscriptions == null ? new List<string> () : subscribe.Subscriptions.Select (s => s.TopicFilter);
+
+				tracer.Info (Properties.Resources.Tracer_ServerPacketListener_DispatchingSubscribe, flow.GetType().Name, clientId, string.Join(", ", topics));
+			} else {
+				tracer.Info (Properties.Resources.Tracer_ServerPacketListener_DispatchingMessage, packet.Type, flow.GetType().Name, clientId);
 			}
 		}
 

@@ -3,6 +3,7 @@ using System.Reactive;
 using System.Net.Mqtt.Packets;
 using System.Net.Mqtt.Storage;
 using System.Net.Mqtt.Server;
+using System.Net.Mqtt.Ordering;
 
 namespace System.Net.Mqtt.Flows
 {
@@ -10,11 +11,13 @@ namespace System.Net.Mqtt.Flows
 	{
 		readonly IAuthenticationProvider authenticationProvider;
 		readonly IConnectionProvider connectionProvider;
+		readonly IPacketDispatcherProvider dispatcherProvider;
 		readonly IPacketIdProvider packetIdProvider;
 		readonly IEventStream eventStream;
 
 		public ServerProtocolFlowProvider (IAuthenticationProvider authenticationProvider,
 			IConnectionProvider connectionProvider,
+			IPacketDispatcherProvider dispatcherProvider,
 			ITopicEvaluator topicEvaluator,
 			IRepositoryProvider repositoryProvider,
 			IPacketIdProvider packetIdProvider,
@@ -24,6 +27,7 @@ namespace System.Net.Mqtt.Flows
 		{
 			this.authenticationProvider = authenticationProvider;
 			this.connectionProvider = connectionProvider;
+			this.dispatcherProvider = dispatcherProvider;
 			this.packetIdProvider = packetIdProvider;
 			this.eventStream = eventStream;
 		}
@@ -35,11 +39,12 @@ namespace System.Net.Mqtt.Flows
 			var sessionRepository = repositoryProvider.GetRepository<ClientSession>();
 			var willRepository = repositoryProvider.GetRepository<ConnectionWill> ();
 			var retainedRepository = repositoryProvider.GetRepository<RetainedMessage> ();
-			var senderFlow = new PublishSenderFlow (sessionRepository, configuration);
+			var senderFlow = new ServerPublishSenderFlow (connectionProvider, packetIdProvider, 
+				dispatcherProvider, sessionRepository, configuration);
 
 			flows.Add (ProtocolFlowType.Connect, new ServerConnectFlow (this.authenticationProvider, sessionRepository, willRepository, senderFlow));
 			flows.Add (ProtocolFlowType.PublishSender, senderFlow);
-			flows.Add (ProtocolFlowType.PublishReceiver, new ServerPublishReceiverFlow (topicEvaluator, connectionProvider,
+			flows.Add (ProtocolFlowType.PublishReceiver, new ServerPublishReceiverFlow (topicEvaluator, dispatcherProvider, connectionProvider,
 				senderFlow, retainedRepository, sessionRepository, willRepository, packetIdProvider, eventStream, configuration));
 			flows.Add (ProtocolFlowType.Subscribe, new ServerSubscribeFlow (topicEvaluator, sessionRepository, 
 				retainedRepository, packetIdProvider, senderFlow, configuration));
