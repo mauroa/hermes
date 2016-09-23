@@ -11,27 +11,30 @@ namespace System.Net.Mqtt.Flows
     internal class ServerSubscribeFlow : IProtocolFlow
 	{
 		static readonly ITracer tracer = Tracer.Get<ServerSubscribeFlow> ();
-
-		readonly IMqttTopicEvaluator topicEvaluator;
-		readonly IRepository<ClientSession> sessionRepository;
-		readonly IRepository<RetainedMessage> retainedRepository;
-		readonly IPacketIdProvider packetIdProvider;
+		
 		readonly IPublishSenderFlow senderFlow;
-		readonly MqttConfiguration configuration;
+        readonly IPacketDispatcherProvider dispatcherProvider;
+        readonly IPacketIdProvider packetIdProvider;
+        readonly IMqttTopicEvaluator topicEvaluator;
+        readonly IRepository<ClientSession> sessionRepository;
+        readonly IRepository<RetainedMessage> retainedRepository;
+        readonly MqttConfiguration configuration;
 
-		public ServerSubscribeFlow (IMqttTopicEvaluator topicEvaluator,
-			IRepository<ClientSession> sessionRepository,
-			IRepository<RetainedMessage> retainedRepository,
+		public ServerSubscribeFlow (IPublishSenderFlow senderFlow, 
+            IPacketDispatcherProvider dispatcherProvider,
 			IPacketIdProvider packetIdProvider,
-			IPublishSenderFlow senderFlow,
-			MqttConfiguration configuration)
+            IMqttTopicEvaluator topicEvaluator,
+            IRepository<ClientSession> sessionRepository,
+            IRepository<RetainedMessage> retainedRepository,
+            MqttConfiguration configuration)
 		{
-			this.topicEvaluator = topicEvaluator;
-			this.sessionRepository = sessionRepository;
-			this.retainedRepository = retainedRepository;
-			this.packetIdProvider = packetIdProvider;
 			this.senderFlow = senderFlow;
-			this.configuration = configuration;
+            this.dispatcherProvider = dispatcherProvider;
+            this.packetIdProvider = packetIdProvider;
+            this.topicEvaluator = topicEvaluator;
+            this.sessionRepository = sessionRepository;
+            this.retainedRepository = retainedRepository;
+            this.configuration = configuration;
 		}
 
 		public async Task ExecuteAsync (string clientId, IPacket input, IMqttChannel<IPacket> channel)
@@ -96,21 +99,27 @@ namespace System.Net.Mqtt.Flows
 
 		async Task SendRetainedMessagesAsync (ClientSubscription subscription, IMqttChannel<IPacket> channel)
 		{
-			var retainedMessages = retainedRepository.GetAll ()
-				.Where(r => topicEvaluator.Matches(r.Topic, subscription.TopicFilter));
+			var retainedMessages = retainedRepository
+                .GetAll ()
+				.Where (r => topicEvaluator.Matches (r.Topic, subscription.TopicFilter));
 
-			if (retainedMessages != null) {
-				foreach (var retainedMessage in retainedMessages) {
-					ushort? packetId = subscription.MaximumQualityOfService == MqttQualityOfService.AtMostOnce ?
-						null : (ushort?)packetIdProvider.GetPacketId ();
-					var publish = new Publish (retainedMessage.Topic, subscription.MaximumQualityOfService,
-						retain: true, duplicated: false, packetId: packetId) {
-						Payload = retainedMessage.Payload
-					};
+            if (retainedMessages == null) {
+                return;
+            }
 
-					await senderFlow.SendPublishAsync (subscription.ClientId, publish, channel)
-						.ConfigureAwait (continueOnCapturedContext: false);
-				}
+			foreach (var retainedMessage in retainedMessages) {
+				var packetId = subscription.MaximumQualityOfService == MqttQualityOfService.AtMostOnce ?
+					default (ushort) : packetIdProvider.GetPacketId ();
+				var publish = new Publish (retainedMessage.Topic, subscription.MaximumQualityOfService,
+					retain: true, duplicated: false, packetId: packetId) {
+					Payload = retainedMessage.Payload
+				};
+                var orderId = dispatcherProvider.GetDispatcher (subscription.ClientId).CreateOrder (DispatchPacketType.Publish);
+
+                publish.AssignOrder (orderId);
+
+				await senderFlow.SendPublishAsync (subscription.ClientId, publish, channel)
+					.ConfigureAwait (continueOnCapturedContext: false);
 			}
 		}
 	}

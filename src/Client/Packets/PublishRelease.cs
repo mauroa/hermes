@@ -1,17 +1,29 @@
 ﻿namespace System.Net.Mqtt.Packets
 {
-	internal class PublishRelease : IFlowPacket, IEquatable<PublishRelease>
+	internal class PublishRelease : IOrderedPacket, IEquatable<PublishRelease>
 	{
 		public PublishRelease (ushort packetId)
 		{
-			PacketId = packetId;
-		}
+            PacketId = packetId;
+            OrderId = Guid.Empty;
+        }
 
-		public MqttPacketType Type { get { return MqttPacketType.PublishRelease; } }
+        public MqttPacketType Type { get { return MqttPacketType.PublishRelease; } }
 
 		public ushort PacketId { get; }
 
-		public bool Equals (PublishRelease other)
+        public Guid OrderId { get; private set; }
+
+        public void AssignOrder (Guid orderId)
+        {
+            if (OrderId != Guid.Empty) {
+                throw new InvalidOperationException (string.Format (Properties.Resources.OrderedPacket_AlreadyAssignedOrder, nameof (PublishRelease)));
+            }
+
+            OrderId = orderId;
+        }
+
+        public bool Equals (PublishRelease other)
 		{
 			if (other == null)
 				return false;

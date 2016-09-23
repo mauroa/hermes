@@ -12,10 +12,11 @@ namespace System.Net.Mqtt.Flows
 		protected readonly IRepository<RetainedMessage> retainedRepository;
 
 		public PublishReceiverFlow (IMqttTopicEvaluator topicEvaluator,
-			IRepository<RetainedMessage> retainedRepository,
+            IPacketDispatcherProvider dispatcherProvider,
+            IRepository<RetainedMessage> retainedRepository,
 			IRepository<ClientSession> sessionRepository,
 			MqttConfiguration configuration)
-			: base (sessionRepository, configuration)
+			: base (dispatcherProvider, sessionRepository, configuration)
 		{
 			this.topicEvaluator = topicEvaluator;
 			this.retainedRepository = retainedRepository;
@@ -43,12 +44,12 @@ namespace System.Net.Mqtt.Flows
 
         protected virtual void Validate (Publish publish, string clientId)
         {
-            if (publish.QualityOfService != MqttQualityOfService.AtMostOnce && !publish.PacketId.HasValue)
+            if (publish.QualityOfService != MqttQualityOfService.AtMostOnce && !publish.HasPacketId ())
             {
                 throw new MqttException(Properties.Resources.PublishReceiverFlow_PacketIdRequired);
             }
 
-            if (publish.QualityOfService == MqttQualityOfService.AtMostOnce && publish.PacketId.HasValue)
+            if (publish.QualityOfService == MqttQualityOfService.AtMostOnce && publish.HasPacketId ())
             {
                 throw new MqttException(Properties.Resources.PublishReceiverFlow_PacketIdNotAllowed);
             }
@@ -65,7 +66,10 @@ namespace System.Net.Mqtt.Flows
 				throw new MqttException (string.Format (Properties.Resources.SessionRepository_ClientSessionNotFound, clientId));
 			}
 
-			if (qos == MqttQualityOfService.ExactlyOnce && session.GetPendingAcknowledgements ().Any (ack => ack.Type == MqttPacketType.PublishReceived && ack.PacketId == publish.PacketId.Value)) {
+			if (qos == MqttQualityOfService.ExactlyOnce && 
+                session
+                    .GetPendingAcknowledgements ()
+                    .Any (ack => ack.Type == MqttPacketType.PublishReceived && ack.PacketId == publish.PacketId)) {
 				await SendQosAck (clientId, qos, publish, channel)
 					.ConfigureAwait (continueOnCapturedContext: false);
 
@@ -80,23 +84,36 @@ namespace System.Net.Mqtt.Flows
 
 		async Task HandlePublishReleaseAsync (string clientId, PublishRelease publishRelease, IMqttChannel<IPacket> channel)
 		{
-			RemovePendingAcknowledgement (clientId, publishRelease.PacketId, MqttPacketType.PublishReceived);
+			RemovePendingAcknowledgement (clientId, publishRelease, MqttPacketType.PublishReceived);
 
-			await SendAckAsync (clientId, new PublishComplete (publishRelease.PacketId), channel)
+            var publishComplete = new PublishComplete (publishRelease.PacketId);
+
+            publishComplete.AssignOrder (publishRelease.OrderId);
+
+            await SendAckAsync (clientId, publishComplete, channel)
 				.ConfigureAwait (continueOnCapturedContext: false);
 		}
 
 		async Task SendQosAck (string clientId, MqttQualityOfService qos, Publish publish, IMqttChannel<IPacket> channel)
 		{
 			if (qos == MqttQualityOfService.AtMostOnce) {
-				return;
-			} else if (qos == MqttQualityOfService.AtLeastOnce) {
-				await SendAckAsync (clientId, new PublishAck (publish.PacketId.Value), channel)
-					.ConfigureAwait (continueOnCapturedContext: false);
-			} else {
-				await SendAckAsync (clientId, new PublishReceived (publish.PacketId.Value), channel)
-					.ConfigureAwait (continueOnCapturedContext: false);
+                dispatcherProvider.GetDispatcher (clientId).CompleteOrder (DispatchPacketType.PublishAck1, publish.OrderId);
+
+                return;
 			}
-		}
+
+            var ack = default (IOrderedPacket);
+
+            if (qos == MqttQualityOfService.AtLeastOnce) {
+                ack = new PublishAck (publish.PacketId);
+			} else {
+                ack = new PublishReceived (publish.PacketId);
+			}
+
+            ack.AssignOrder (publish.OrderId);
+
+            await SendAckAsync (clientId, ack, channel)
+                .ConfigureAwait(continueOnCapturedContext: false);
+        }
 	}
 }

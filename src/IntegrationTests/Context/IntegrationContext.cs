@@ -2,18 +2,18 @@
 using System.Collections.Concurrent;
 using System.Configuration;
 using System.Diagnostics;
+using System.Linq;
 using System.Net;
 using System.Net.Mqtt;
-using System.Net.Mqtt.Packets;
-using System.Linq;
-using System.Net.Sockets;
-using System.Net.Mqtt.Exceptions;
 using System.Net.Mqtt.Bindings;
+using System.Net.Mqtt.Exceptions;
+using System.Net.Mqtt.Packets;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 
 namespace IntegrationTests.Context
 {
-	public abstract class IntegrationContext
+    public abstract class IntegrationContext
 	{
 		static readonly ConcurrentBag<int> usedPorts;
 		static readonly Random random = new Random ();
@@ -76,7 +76,7 @@ namespace IntegrationTests.Context
 			return string.Concat ("Client", Guid.NewGuid ().ToString ().Replace("-", string.Empty).Substring (0, 15));
 		}
 
-		protected int GetTestLoad()
+		protected int GetTestLoad ()
 		{
 			var testLoad = 0;
 			var loadValue = ConfigurationManager.AppSettings["testLoad"];

@@ -25,19 +25,35 @@ namespace Tests.Flows
 			var connectionProvider = new Mock<IConnectionProvider> ();
 			var sessionRepository = new Mock<IRepository<ClientSession>> ();
 
-			sessionRepository.Setup (r => r.Get (It.IsAny<Expression<Func<ClientSession, bool>>> ()))
+			sessionRepository
+                .Setup (r => r.Get (It.IsAny<Expression<Func<ClientSession, bool>>> ()))
 				.Returns (new ClientSession {
 					ClientId = clientId,
-					PendingMessages = new List<PendingMessage> { new PendingMessage() }
+					PendingMessages = new List<PendingMessage> { new PendingMessage () }
 				});
 
-			var flow = new PublishSenderFlow (sessionRepository.Object, configuration);
+            var dispatcher = new Mock<IPacketDispatcher>();
+            var dispatcherProvider = new Mock<IPacketDispatcherProvider> ();
+
+            dispatcher
+                .Setup(d => d.DispatchAsync (It.IsAny<IOrderedPacket> (), It.IsAny<IMqttChannel<IPacket>> ()))
+                .Callback<IOrderedPacket, IMqttChannel<IPacket>>(async (p, c) => {
+                    await c.SendAsync (p);
+                })
+                .Returns (Task.Delay (0));
+
+            dispatcherProvider
+                .Setup(p => p.GetDispatcher (It.IsAny<string> ()))
+                .Returns (dispatcher.Object);
+
+            var flow = new PublishSenderFlow (dispatcherProvider.Object, sessionRepository.Object, configuration);
 
 			var topic = "foo/bar";
-			var packetId = (ushort?)new Random ().Next (0, ushort.MaxValue);
+			var packetId = (ushort)new Random ().Next (0, ushort.MaxValue);
 			var publish = new Publish (topic, MqttQualityOfService.AtLeastOnce, retain: false, duplicated: false, packetId: packetId);
 
 			publish.Payload = Encoding.UTF8.GetBytes ("Publish Receiver Flow Test");
+            publish.AssignOrder (Guid.NewGuid ());
 
 			var receiver = new Subject<IPacket> ();
 			var sender = new Subject<IPacket> ();
@@ -66,17 +82,99 @@ namespace Tests.Flows
 			});
 
 			var flowTask = flow.SendPublishAsync (clientId, publish, channel.Object);
-
 			var retried = retrySignal.Wait (2000);
 
 			Assert.True (retried);
-			channel.Verify (c => c.SendAsync (It.Is<IPacket> (p => p is Publish  && 
+            dispatcherProvider.Verify (p => p.GetDispatcher (It.Is<string> (s => s == clientId)));
+            dispatcher.Verify (d => d.DispatchAsync (It.Is<IOrderedPacket> (p => p.OrderId == publish.OrderId),
+               It.Is<IMqttChannel<IPacket>> (c => c == channel.Object)), Times.AtLeast(2));
+            channel.Verify (c => c.SendAsync (It.Is<IPacket> (p => p is Publish  && 
 				((Publish)p).Topic == topic && 
 				((Publish)p).QualityOfService == MqttQualityOfService.AtLeastOnce &&
 				((Publish)p).PacketId == packetId)), Times.AtLeast(2));
 		}
 
-		[Fact]
+        [Fact]
+        public void when_sending_publish_with_qos1_and_publish_ack_is_received_then_publish_is_not_re_transmitted()
+        {
+            var clientId = Guid.NewGuid ().ToString ();
+
+            var configuration = Mock.Of<MqttConfiguration> (c => c.WaitTimeoutSecs == 1 && c.MaximumQualityOfService == MqttQualityOfService.AtLeastOnce);
+            var connectionProvider = new Mock<IConnectionProvider> ();
+            var sessionRepository = new Mock<IRepository<ClientSession>> ();
+
+            sessionRepository.Setup (r => r.Get (It.IsAny<Expression<Func<ClientSession, bool>>> ()))
+                .Returns(new ClientSession
+                {
+                    ClientId = clientId,
+                    PendingMessages = new List<PendingMessage> { new PendingMessage() }
+                });
+
+            var dispatcher = new Mock<IPacketDispatcher> ();
+            var dispatcherProvider = new Mock<IPacketDispatcherProvider> ();
+
+            dispatcher
+                .Setup (d => d.DispatchAsync (It.IsAny<IOrderedPacket>(), It.IsAny<IMqttChannel<IPacket>> ()))
+                .Callback<IOrderedPacket, IMqttChannel<IPacket>> (async (p, c) => {
+                    await c.SendAsync (p);
+                });
+
+            dispatcherProvider
+                .Setup (p => p.GetDispatcher (It.IsAny<string> ()))
+                .Returns (dispatcher.Object);
+
+            var flow = new PublishSenderFlow (dispatcherProvider.Object, sessionRepository.Object, configuration);
+
+            var topic = "foo/bar";
+            var packetId = (ushort)new Random ().Next (0, ushort.MaxValue);
+            var publish = new Publish (topic, MqttQualityOfService.AtLeastOnce, retain: false, duplicated: false, packetId: packetId);
+
+            publish.Payload = Encoding.UTF8.GetBytes("Publish Receiver Flow Test");
+            publish.AssignOrder (Guid.NewGuid ());
+
+            var receiver = new Subject<IPacket> ();
+            var sender = new Subject<IPacket> ();
+            var channel = new Mock<IMqttChannel<IPacket>> ();
+
+            channel.Setup (c => c.IsConnected).Returns (true);
+            channel.Setup (c => c.ReceiverStream).Returns (receiver);
+            channel.Setup (c => c.SenderStream).Returns (sender);
+            channel.Setup (c => c.SendAsync (It.IsAny<IPacket> ()))
+                .Callback<IPacket> (packet => sender.OnNext (packet))
+                .Returns (Task.Delay (0));
+
+            connectionProvider.Setup (m => m.GetConnection (It.IsAny<string> ())).Returns (channel.Object);
+
+            var retrySignal = new ManualResetEventSlim (initialState: false);
+            var retries = 0;
+
+            sender.Subscribe (p => {
+                if (p is Publish) {
+                    retries++;
+                }
+
+                if (retries > 1) {
+                    retrySignal.Set ();
+                }
+            });
+
+            var publishTask = flow.SendPublishAsync (clientId, publish, channel.Object);
+
+            receiver.OnNext (new PublishAck (publish.PacketId));
+
+            var retried = retrySignal.Wait (1000);
+
+            Assert.False (retried);
+            dispatcherProvider.Verify (p => p.GetDispatcher (It.Is<string> (s => s == clientId)));
+            dispatcher.Verify (d => d.DispatchAsync(It.Is<IOrderedPacket>(p => p.OrderId == publish.OrderId),
+               It.Is<IMqttChannel<IPacket>> (c => c == channel.Object)), Times.Once);
+            channel.Verify (c => c.SendAsync (It.Is<IPacket>(p => p is Publish &&
+             ((Publish)p).Topic == topic &&
+             ((Publish)p).QualityOfService == MqttQualityOfService.AtLeastOnce &&
+             ((Publish)p).PacketId == packetId)), Times.Once);
+        }
+
+        [Fact]
 		public void when_sending_publish_with_qos2_and_publish_received_is_not_received_then_publish_is_re_transmitted()
 		{
 			var clientId = Guid.NewGuid ().ToString ();
@@ -91,15 +189,30 @@ namespace Tests.Flows
 					PendingMessages = new List<PendingMessage> { new PendingMessage() }
 				});
 
-			var flow = new PublishSenderFlow (sessionRepository.Object, configuration);
+            var dispatcher = new Mock<IPacketDispatcher> ();
+            var dispatcherProvider = new Mock<IPacketDispatcherProvider> ();
+
+            dispatcher
+                .Setup (d => d.DispatchAsync (It.IsAny<IOrderedPacket> (), It.IsAny<IMqttChannel<IPacket>> ()))
+                .Callback<IOrderedPacket, IMqttChannel<IPacket>>(async (p, c) => {
+                    await c.SendAsync (p);
+                })
+                .Returns (Task.Delay (0));
+
+            dispatcherProvider
+                .Setup (p => p.GetDispatcher (It.IsAny<string> ()))
+                .Returns (dispatcher.Object);
+
+            var flow = new PublishSenderFlow(dispatcherProvider.Object, sessionRepository.Object, configuration);
 
 			var topic = "foo/bar";
-			var packetId = (ushort?)new Random ().Next (0, ushort.MaxValue);
+			var packetId = (ushort)new Random ().Next (0, ushort.MaxValue);
 			var publish = new Publish (topic, MqttQualityOfService.ExactlyOnce, retain: false, duplicated: false, packetId: packetId);
 
 			publish.Payload = Encoding.UTF8.GetBytes ("Publish Receiver Flow Test");
+            publish.AssignOrder (Guid.NewGuid ());
 
-			var receiver = new Subject<IPacket> ();
+            var receiver = new Subject<IPacket> ();
 			var sender = new Subject<IPacket> ();
 			var channel = new Mock<IMqttChannel<IPacket>> ();
 
@@ -130,13 +243,95 @@ namespace Tests.Flows
 			var retried = retrySignal.Wait (2000);
 
 			Assert.True (retried);
-			channel.Verify (c => c.SendAsync (It.Is<IPacket> (p => p is Publish  && 
+            dispatcherProvider.Verify (p => p.GetDispatcher (It.Is<string> (s => s == clientId)));
+            dispatcher.Verify (d => d.DispatchAsync (It.Is<IOrderedPacket>(p => p.OrderId == publish.OrderId),
+                It.Is<IMqttChannel<IPacket>> (c => c == channel.Object)), Times.AtLeast(2));
+            channel.Verify (c => c.SendAsync (It.Is<IPacket> (p => p is Publish  && 
 				((Publish)p).Topic == topic && 
 				((Publish)p).QualityOfService == MqttQualityOfService.ExactlyOnce &&
 				((Publish)p).PacketId == packetId)), Times.AtLeast(2));
 		}
 
-		[Fact]
+        [Fact]
+        public void when_sending_publish_with_qos2_and_publish_received_is_received_then_publish_is_not_re_transmitted()
+        {
+            var clientId = Guid.NewGuid ().ToString ();
+
+            var configuration = Mock.Of<MqttConfiguration> (c => c.WaitTimeoutSecs == 1 && c.MaximumQualityOfService == MqttQualityOfService.ExactlyOnce);
+            var connectionProvider = new Mock<IConnectionProvider> ();
+            var sessionRepository = new Mock<IRepository<ClientSession>> ();
+
+            sessionRepository.Setup (r => r.Get (It.IsAny<Expression<Func<ClientSession, bool>>> ()))
+                .Returns(new ClientSession {
+                    ClientId = clientId,
+                    PendingMessages = new List<PendingMessage> { new PendingMessage() }
+                });
+
+            var dispatcher = new Mock<IPacketDispatcher> ();
+            var dispatcherProvider = new Mock<IPacketDispatcherProvider> ();
+
+            dispatcher
+                .Setup (d => d.DispatchAsync (It.IsAny<IOrderedPacket> (), It.IsAny<IMqttChannel<IPacket>> ()))
+                .Callback<IOrderedPacket, IMqttChannel<IPacket>> (async (p, c) => {
+                    await c.SendAsync (p);
+                });
+
+            dispatcherProvider
+                .Setup (p => p.GetDispatcher (It.IsAny<string> ()))
+                .Returns (dispatcher.Object);
+
+            var flow = new PublishSenderFlow (dispatcherProvider.Object, sessionRepository.Object, configuration);
+
+            var topic = "foo/bar";
+            var packetId = (ushort)new Random ().Next(0, ushort.MaxValue);
+            var publish = new Publish (topic, MqttQualityOfService.ExactlyOnce, retain: false, duplicated: false, packetId: packetId);
+
+            publish.Payload = Encoding.UTF8.GetBytes("Publish Receiver Flow Test");
+            publish.AssignOrder (Guid.NewGuid ());
+
+            var receiver = new Subject<IPacket> ();
+            var sender = new Subject<IPacket> ();
+            var channel = new Mock<IMqttChannel<IPacket>> ();
+
+            channel.Setup (c => c.IsConnected).Returns (true);
+            channel.Setup (c => c.ReceiverStream).Returns (receiver);
+            channel.Setup (c => c.SenderStream).Returns (sender);
+            channel.Setup (c => c.SendAsync (It.IsAny<IPacket> ()))
+                .Callback<IPacket> (packet => sender.OnNext (packet))
+                .Returns (Task.Delay (0));
+
+            connectionProvider.Setup (m => m.GetConnection (It.IsAny<string> ())).Returns (channel.Object);
+
+            var retrySignal = new ManualResetEventSlim (initialState: false);
+            var retries = 0;
+
+            sender.Subscribe (p => {
+                if (p is Publish) {
+                    retries++;
+                }
+
+                if (retries > 1) {
+                    retrySignal.Set ();
+                }
+            });
+
+            var publishTask = flow.SendPublishAsync (clientId, publish, channel.Object);
+
+            receiver.OnNext (new PublishReceived (publish.PacketId));
+
+            var retried = retrySignal.Wait (1000);
+
+            Assert.False (retried);
+            dispatcherProvider.Verify (p => p.GetDispatcher (It.Is<string> (s => s == clientId)));
+            dispatcher.Verify (d => d.DispatchAsync (It.Is<IOrderedPacket>(p => p.OrderId == publish.OrderId),
+               It.Is<IMqttChannel<IPacket>> (c => c == channel.Object)), Times.Once);
+            channel.Verify(c => c.SendAsync (It.Is<IPacket>(p => p is Publish &&
+             ((Publish)p).Topic == topic &&
+             ((Publish)p).QualityOfService == MqttQualityOfService.ExactlyOnce &&
+             ((Publish)p).PacketId == packetId)), Times.Once);
+        }
+
+        [Fact]
 		public void when_sending_publish_received_then_publish_release_is_sent()
 		{
 			var clientId = Guid.NewGuid ().ToString ();
@@ -151,9 +346,22 @@ namespace Tests.Flows
 					PendingMessages = new List<PendingMessage> { new PendingMessage() }
 				});
 
-			var flow = new PublishSenderFlow (sessionRepository.Object, configuration);
+            var dispatcher = new Mock<IPacketDispatcher> ();
+            var dispatcherProvider = new Mock<IPacketDispatcherProvider> ();
 
-			var packetId = (ushort)new Random ().Next (0, ushort.MaxValue);
+            dispatcher
+                .Setup (d => d.DispatchAsync (It.IsAny<IOrderedPacket> (), It.IsAny<IMqttChannel<IPacket>> ()))
+                .Callback<IOrderedPacket, IMqttChannel<IPacket>> (async (p, c) => {
+                    await c.SendAsync (p);
+                });
+
+            dispatcherProvider
+                .Setup (p => p.GetDispatcher (It.IsAny<string> ()))
+                .Returns (dispatcher.Object);
+
+            var flow = new PublishSenderFlow (dispatcherProvider.Object, sessionRepository.Object, configuration);
+
+            var packetId = (ushort)new Random ().Next (0, ushort.MaxValue);
 			var publishReceived = new PublishReceived (packetId);
 			var receiver = new Subject<IPacket> ();
 			var sender = new Subject<IPacket> ();
@@ -181,7 +389,10 @@ namespace Tests.Flows
 			var ackSent = ackSentSignal.Wait (2000);
 
 			Assert.True (ackSent);
-			channel.Verify (c => c.SendAsync (It.Is<IPacket> (p => p is PublishRelease 
+            dispatcherProvider.Verify (p => p.GetDispatcher (It.Is<string> (s => s == clientId)));
+            dispatcher.Verify (d => d.DispatchAsync (It.Is<IOrderedPacket>(p => p.OrderId == publishReceived.OrderId),
+                It.Is<IMqttChannel<IPacket>> (c => c == channel.Object)), Times.AtLeastOnce);
+            channel.Verify (c => c.SendAsync (It.Is<IPacket> (p => p is PublishRelease 
 				&& (p as PublishRelease).PacketId == packetId)), Times.AtLeastOnce);
 		}
 
@@ -200,9 +411,22 @@ namespace Tests.Flows
 					PendingMessages = new List<PendingMessage> { new PendingMessage() }
 				});
 
-			var flow = new PublishSenderFlow (sessionRepository.Object, configuration);
+            var dispatcher = new Mock<IPacketDispatcher> ();
+            var dispatcherProvider = new Mock<IPacketDispatcherProvider> ();
 
-			var packetId = (ushort)new Random ().Next (0, ushort.MaxValue);
+            dispatcher
+                .Setup (d => d.DispatchAsync (It.IsAny<IOrderedPacket> (), It.IsAny<IMqttChannel<IPacket>> ()))
+                .Callback<IOrderedPacket, IMqttChannel<IPacket>> (async (p, c) => {
+                    await c.SendAsync (p);
+                });
+
+            dispatcherProvider
+                .Setup (p => p.GetDispatcher (It.IsAny<string> ()))
+                .Returns (dispatcher.Object);
+
+            var flow = new PublishSenderFlow (dispatcherProvider.Object, sessionRepository.Object, configuration);
+
+            var packetId = (ushort)new Random ().Next (0, ushort.MaxValue);
 			var publishReceived = new PublishReceived (packetId);
 			var receiver = new Subject<IPacket> ();
 			var sender = new Subject<IPacket> ();
@@ -230,8 +454,11 @@ namespace Tests.Flows
 			var ackSent = ackSentSignal.Wait (2000);
 
 			Assert.True (ackSent);
-			channel.Verify (c => c.SendAsync (It.Is<IPacket> (p => p is PublishRelease 
-				&& (p as PublishRelease).PacketId == packetId)), Times.AtLeast(1));
+            dispatcherProvider.Verify (p => p.GetDispatcher (It.Is<string> (s => s == clientId)));
+            dispatcher.Verify (d => d.DispatchAsync (It.Is<IOrderedPacket> (p => p.OrderId == publishReceived.OrderId),
+                It.Is<IMqttChannel<IPacket>> (c => c == channel.Object)), Times.AtLeastOnce);
+            channel.Verify (c => c.SendAsync (It.Is<IPacket> (p => p is PublishRelease 
+				&& (p as PublishRelease).PacketId == packetId)), Times.AtLeastOnce);
 		}
 	}
 }

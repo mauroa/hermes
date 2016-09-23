@@ -2,13 +2,13 @@
 
 namespace System.Net.Mqtt.Formatters
 {
-	internal class FlowPacketFormatter<T> : Formatter<T>
-		where T : class, IFlowPacket
+	internal class IdentifiablePacketFormatter<T> : Formatter<T>
+		where T : class, IIdentifiablePacket
 	{
 		readonly MqttPacketType packetType;
 		readonly Func<ushort, T> packetFactory;
 
-		public FlowPacketFormatter (MqttPacketType packetType, Func<ushort, T> packetFactory)
+		public IdentifiablePacketFormatter (MqttPacketType packetType, Func<ushort, T> packetFactory)
 		{
 			this.packetType = packetType;
 			this.packetFactory = packetFactory;

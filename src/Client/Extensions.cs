@@ -43,7 +43,31 @@ namespace System.Net.Mqtt
 			return flowType;
 		}
 
-		internal static MqttQualityOfService GetSupportedQos (this MqttConfiguration configuration, MqttQualityOfService requestedQos)
+        internal static DispatchPacketType ToDispatchPacketType (this MqttPacketType packetType)
+        {
+            var dispatchType = default (DispatchPacketType);
+
+            switch (packetType)
+            {
+                case MqttPacketType.Publish:
+                    dispatchType = DispatchPacketType.Publish;
+                    break;
+                case MqttPacketType.PublishAck:
+                case MqttPacketType.PublishReceived:
+                    dispatchType = DispatchPacketType.PublishAck1;
+                    break;
+                case MqttPacketType.PublishRelease:
+                    dispatchType = DispatchPacketType.PublishAck2;
+                    break;
+                case MqttPacketType.PublishComplete:
+                    dispatchType = DispatchPacketType.PublishAck3;
+                    break;
+            }
+
+            return dispatchType;
+        }
+
+        internal static MqttQualityOfService GetSupportedQos (this MqttConfiguration configuration, MqttQualityOfService requestedQos)
 		{
 			return requestedQos > configuration.MaximumQualityOfService ?
 				configuration.MaximumQualityOfService :
@@ -68,5 +92,10 @@ namespace System.Net.Mqtt
 
 			return returnCode;
 		}
+
+        internal static bool HasPacketId (this IIdentifiablePacket packet)
+        {
+            return packet.PacketId != default (ushort);
+        }
 	}
 }

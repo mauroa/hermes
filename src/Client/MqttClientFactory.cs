@@ -59,13 +59,14 @@ namespace System.Net.Mqtt
 				var innerChannelFactory = binding.GetChannelFactory (hostAddress, configuration);
 				var channelFactory = new PacketChannelFactory (innerChannelFactory, topicEvaluator, configuration);
 				var packetIdProvider = new PacketIdProvider ();
-				var repositoryProvider = new InMemoryRepositoryProvider ();
-				var flowProvider = new ClientProtocolFlowProvider (topicEvaluator, repositoryProvider, configuration);
-				var packetChannel = await channelFactory
+                var dispatcherProvider = new PacketDispatcherProvider ();
+                var repositoryProvider = new InMemoryRepositoryProvider ();
+				var flowProvider = new ClientProtocolFlowProvider (topicEvaluator, dispatcherProvider, repositoryProvider, configuration);
+                var packetChannel = await channelFactory
                     .CreateAsync ()
                     .ConfigureAwait (continueOnCapturedContext: false);
 
-				return new MqttClient (packetChannel, flowProvider, repositoryProvider, packetIdProvider, configuration);
+				return new MqttClient (packetChannel, flowProvider, dispatcherProvider, repositoryProvider, packetIdProvider, configuration);
 			} catch (Exception ex) {
 				tracer.Error (ex, Properties.Resources.Client_InitializeError);
 

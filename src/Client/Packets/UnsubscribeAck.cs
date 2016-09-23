@@ -1,6 +1,6 @@
 ﻿namespace System.Net.Mqtt.Packets
 {
-	internal class UnsubscribeAck : IFlowPacket, IEquatable<UnsubscribeAck>
+	internal class UnsubscribeAck : IIdentifiablePacket, IEquatable<UnsubscribeAck>
 	{
 		public UnsubscribeAck (ushort packetId)
 		{

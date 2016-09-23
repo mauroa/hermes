@@ -11,6 +11,13 @@
     <DocumentationFile>bin\$(Configuration)\$(AssemblyName).xml</DocumentationFile>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="AsyncLock.cs" />
+    <Compile Include="DispatchOrder.cs" />
+    <Compile Include="DispatchOrderItem.cs" />
+    <Compile Include="DispatchOrderState.cs" />
+    <Compile Include="DispatchPacketType.cs" />
+    <Compile Include="IPacketDispatcher.cs" />
+    <Compile Include="IPacketDispatcherProvider.cs" />
     <Compile Include="MqttApplicationMessage.cs" />
     <Compile Include="ByteExtensions.cs" />
     <Compile Include="MqttClient.cs" />
@@ -58,14 +65,17 @@
     <Compile Include="IMqttTopicEvaluator.cs" />
     <Compile Include="PacketChannel.cs" />
     <Compile Include="PacketChannelFactory.cs" />
+    <Compile Include="PacketDispatcher.cs" />
+    <Compile Include="PacketDispatcherProvider.cs" />
     <Compile Include="PacketIdProvider.cs" />
     <Compile Include="PacketManager.cs" />
     <Compile Include="PacketBuffer.cs" />
     <Compile Include="Packets\Connect.cs" />
     <Compile Include="Packets\ConnectAck.cs" />
+    <Compile Include="Packets\IOrderedPacket.cs" />
     <Compile Include="Packets\MqttConnectionStatus.cs" />
     <Compile Include="Packets\Disconnect.cs" />
-    <Compile Include="Packets\IFlowPacket.cs" />
+    <Compile Include="Packets\IIdentifiablePacket.cs" />
     <Compile Include="Packets\IPacket.cs" />
     <Compile Include="Packets\MqttPacketType.cs" />
     <Compile Include="Packets\PingRequest.cs" />
@@ -126,6 +136,7 @@
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets" />

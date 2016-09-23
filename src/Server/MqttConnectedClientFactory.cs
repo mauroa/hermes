@@ -29,13 +29,14 @@ namespace System.Net.Mqtt
                 var innerChannelFactory = binding.GetChannelFactory (IPAddress.Loopback.ToString (), configuration);
                 var channelFactory = new PacketChannelFactory (innerChannelFactory, topicEvaluator, configuration);
                 var packetIdProvider = new PacketIdProvider ();
+                var dispatcherProvider = new PacketDispatcherProvider ();
                 var repositoryProvider = new InMemoryRepositoryProvider ();
-                var flowProvider = new ClientProtocolFlowProvider (topicEvaluator, repositoryProvider, configuration);
+                var flowProvider = new ClientProtocolFlowProvider (topicEvaluator, dispatcherProvider, repositoryProvider, configuration);
                 var packetChannel = await channelFactory
                     .CreateAsync ()
                     .ConfigureAwait (continueOnCapturedContext: false);
 
-                return new MqttConnectedClient (packetChannel, flowProvider, repositoryProvider, packetIdProvider, configuration);
+                return new MqttConnectedClient (packetChannel, flowProvider, dispatcherProvider, repositoryProvider, packetIdProvider, configuration);
             }
             catch (Exception ex)
             {
@@ -48,12 +49,13 @@ namespace System.Net.Mqtt
 
     class MqttConnectedClient : MqttClient, IMqttConnectedClient
     {
-        internal MqttConnectedClient(IMqttChannel<IPacket> packetChannel,
+        internal MqttConnectedClient (IMqttChannel<IPacket> packetChannel,
             IProtocolFlowProvider flowProvider,
+            IPacketDispatcherProvider dispatcherProvider,
             IRepositoryProvider repositoryProvider,
             IPacketIdProvider packetIdProvider,
             MqttConfiguration configuration)
-            : base(packetChannel, flowProvider, repositoryProvider, packetIdProvider, configuration)
+            : base (packetChannel, flowProvider, dispatcherProvider, repositoryProvider, packetIdProvider, configuration)
         {
         }
     }

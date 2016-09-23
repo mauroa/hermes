@@ -170,7 +170,8 @@ namespace IntegrationTests
                 }
             };
 
-            var clientRemoteDisconnected = clientDisconnectedEvent.Wait (2500);
+            var waitSeconds = (int)(Configuration.WaitTimeoutSecs * 1.5);
+            var clientRemoteDisconnected = clientDisconnectedEvent.Wait (TimeSpan.FromSeconds (waitSeconds));
 
             Assert.True (clientRemoteDisconnected);
         }

@@ -74,13 +74,14 @@ namespace System.Net.Mqtt
                 var channelFactory = new PacketChannelFactory (topicEvaluator, configuration);
                 var repositoryProvider = new InMemoryRepositoryProvider ();
                 var connectionProvider = new ConnectionProvider ();
+                var dispatcherProvider = new PacketDispatcherProvider ();
                 var packetIdProvider = new PacketIdProvider ();
                 var undeliveredMessagesListener = new Subject<MqttUndeliveredMessage> ();
-                var flowProvider = new ServerProtocolFlowProvider (authenticationProvider, connectionProvider, topicEvaluator,
-                    repositoryProvider, packetIdProvider, undeliveredMessagesListener, configuration);
+                var flowProvider = new ServerProtocolFlowProvider (authenticationProvider, connectionProvider, dispatcherProvider, 
+                    topicEvaluator, repositoryProvider, packetIdProvider, undeliveredMessagesListener, configuration);
 
                 return Task.FromResult<IMqttServer> (new MqttServer (channelProvider, channelFactory,
-                    flowProvider, connectionProvider, undeliveredMessagesListener, configuration));
+                    flowProvider, connectionProvider, dispatcherProvider, undeliveredMessagesListener, configuration));
             } catch (Exception ex) {
                 tracer.Error (ex, ServerProperties.Resources.Server_InitializeError);
 

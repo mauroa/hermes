@@ -55,8 +55,8 @@ namespace Tests.Flows
 				.Setup (p => p.GetConnection (It.Is<string> (c => c == clientId)))
 				.Returns (channel.Object);
 
-			var flow = new ServerSubscribeFlow (topicEvaluator.Object, sessionRepository.Object, 
-				retainedMessageRepository, packetIdProvider, senderFlow, configuration);
+			var flow = new ServerSubscribeFlow (senderFlow, Mock.Of<IPacketDispatcherProvider> (), packetIdProvider, 
+                topicEvaluator.Object, sessionRepository.Object, retainedMessageRepository, configuration);
 
 			await flow.ExecuteAsync (clientId, subscribe, channel.Object)
 				.ConfigureAwait(continueOnCapturedContext: false);
@@ -117,9 +117,8 @@ namespace Tests.Flows
 				.Setup (p => p.GetConnection (It.Is<string> (c => c == clientId)))
 				.Returns (channel.Object);
 
-			var flow = new ServerSubscribeFlow (topicEvaluator.Object,  sessionRepository.Object, 
-				retainedMessageRepository, packetIdProvider,
-				senderFlow, configuration);
+			var flow = new ServerSubscribeFlow (senderFlow, Mock.Of<IPacketDispatcherProvider> (), packetIdProvider, 
+                topicEvaluator.Object, sessionRepository.Object, retainedMessageRepository, configuration);
 
 			await flow.ExecuteAsync (clientId, subscribe, channel.Object)
 				.ConfigureAwait(continueOnCapturedContext: false);
@@ -173,9 +172,8 @@ namespace Tests.Flows
 				.Setup (p => p.GetConnection (It.Is<string> (c => c == clientId)))
 				.Returns (channel.Object);
 
-			var flow = new ServerSubscribeFlow (topicEvaluator.Object, sessionRepository.Object, 
-				retainedMessageRepository, packetIdProvider,
-				senderFlow, configuration);
+			var flow = new ServerSubscribeFlow (senderFlow, Mock.Of<IPacketDispatcherProvider> (), packetIdProvider, 
+                topicEvaluator.Object, sessionRepository.Object, retainedMessageRepository, configuration);
 
 			await flow.ExecuteAsync (clientId, subscribe, channel.Object)
 				.ConfigureAwait(continueOnCapturedContext: false);
@@ -196,7 +194,7 @@ namespace Tests.Flows
 			var configuration = new MqttConfiguration { MaximumQualityOfService = MqttQualityOfService.AtLeastOnce };
 			var topicEvaluator = new Mock<IMqttTopicEvaluator> ();
 			var sessionRepository = new Mock<IRepository<ClientSession>> ();
-			var packetIdProvider = Mock.Of<IPacketIdProvider> ();
+			var packetIdProvider = new Mock<IPacketIdProvider> ();
 			var retainedMessageRepository = new Mock<IRepository<RetainedMessage>> ();
 			var senderFlow = new Mock<IPublishSenderFlow> ();
 
@@ -235,9 +233,23 @@ namespace Tests.Flows
 				.Setup (p => p.GetConnection (It.Is<string> (c => c == clientId)))
 				.Returns (channel.Object);
 
-			var flow = new ServerSubscribeFlow (topicEvaluator.Object, 
-				sessionRepository.Object, retainedMessageRepository.Object,
-				packetIdProvider, senderFlow.Object, configuration);
+            var orderId = Guid.NewGuid ();
+            var dispatcher = new Mock<IPacketDispatcher> ();
+
+            dispatcher.Setup (d => d.CreateOrder (It.IsAny<DispatchPacketType> ())).Returns (orderId);
+
+            var dispatcherProvider = new Mock<IPacketDispatcherProvider> ();
+
+            dispatcherProvider
+                .Setup (p => p.GetDispatcher (It.IsAny<string> ()))
+                .Returns (dispatcher.Object);
+
+            packetIdProvider
+                .Setup (p => p.GetPacketId())
+                .Returns (packetId);
+
+			var flow = new ServerSubscribeFlow (senderFlow.Object, dispatcherProvider.Object, packetIdProvider.Object, 
+                topicEvaluator.Object, sessionRepository.Object, retainedMessageRepository.Object, configuration);
 
 			await flow.ExecuteAsync (clientId, subscribe, channel.Object)
 				.ConfigureAwait(continueOnCapturedContext: false);
@@ -245,9 +257,11 @@ namespace Tests.Flows
 			senderFlow.Verify (f => f.SendPublishAsync (It.Is<string>(s => s == clientId),
 				It.Is<Publish> (p => p.Topic == retainedTopic && 
 					p.QualityOfService == fooQoS && 
-					p.Payload.ToList().SequenceEqual(retainedPayload) && 
-					p.PacketId.HasValue && 
-					p.Retain), 
+					p.Payload.ToList ().SequenceEqual (retainedPayload) && 
+					p.HasPacketId () && 
+                    p.PacketId == packetId &&
+					p.Retain && 
+                    p.OrderId == orderId), 
 				It.Is<IMqttChannel<IPacket>>(c => c == channel.Object),
 				It.Is<PendingMessageStatus>(x => x == PendingMessageStatus.PendingToSend)));
 		}

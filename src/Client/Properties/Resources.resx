@@ -336,4 +336,19 @@
   <data name="Client_SubscriptionRejected" xml:space="preserve">
     <value>The server has rejected the subscription of client {0} to topic {1}</value>
   </data>
+  <data name="DispatchOrder_AddInvalid" xml:space="preserve">
+    <value>Can't add items to a dispatch order if the current status is not Active. Current status: {0}</value>
+  </data>
+  <data name="OrderedPacket_AlreadyAssignedOrder" xml:space="preserve">
+    <value>The packet of type {0} has already an order assigned</value>
+  </data>
+  <data name="PacketDispatcher_CreateOrder_OrderIdAlreadyExists" xml:space="preserve">
+    <value>Cannot create an order with Id {0} because it already exists</value>
+  </data>
+  <data name="PacketDispatcher_Dispatch_OrderDoesNotExists" xml:space="preserve">
+    <value>The packet cannot be dispatched because it's not associated to an existing order. Packet Order Id: {0}</value>
+  </data>
+  <data name="PacketDispatcher_DispatchOrderError" xml:space="preserve">
+    <value>An unexpected error occurred while dispatching orders for packet type {0}</value>
+  </data>
 </root>

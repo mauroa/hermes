@@ -1,17 +1,29 @@
 ﻿namespace System.Net.Mqtt.Packets
 {
-	internal class PublishAck : IFlowPacket, IEquatable<PublishAck>
+	internal class PublishAck : IOrderedPacket, IEquatable<PublishAck>
 	{
 		public PublishAck (ushort packetId)
 		{
-			PacketId = packetId;
-		}
+            PacketId = packetId;
+            OrderId = Guid.Empty;
+        }
 
-		public MqttPacketType Type { get { return MqttPacketType.PublishAck; } }
+        public MqttPacketType Type { get { return MqttPacketType.PublishAck; } }
 
 		public ushort PacketId { get; }
 
-		public bool Equals (PublishAck other)
+        public Guid OrderId { get; private set; }
+
+        public void AssignOrder (Guid orderId)
+        {
+            if (OrderId != Guid.Empty) {
+                throw new InvalidOperationException (string.Format (Properties.Resources.OrderedPacket_AlreadyAssignedOrder, nameof (PublishAck)));
+            }
+
+            OrderId = orderId;
+        }
+
+        public bool Equals (PublishAck other)
 		{
 			if (other == null)
 				return false;

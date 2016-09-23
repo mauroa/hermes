@@ -2,16 +2,17 @@
 
 namespace System.Net.Mqtt.Packets
 {
-	internal class Publish : IPacket, IEquatable<Publish>
+	internal class Publish : IOrderedPacket, IEquatable<Publish>
 	{
-		public Publish (string topic, MqttQualityOfService qualityOfService, bool retain, bool duplicated, ushort? packetId = null)
+		public Publish (string topic, MqttQualityOfService qualityOfService, bool retain, bool duplicated, ushort packetId = default (ushort))
 		{
-			QualityOfService = qualityOfService;
-			Duplicated = duplicated;
-			Retain = retain;
-			Topic = topic;
-			PacketId = packetId;
-		}
+            QualityOfService = qualityOfService;
+            Duplicated = duplicated;
+            Retain = retain;
+            Topic = topic;
+            PacketId = packetId;
+            OrderId = Guid.Empty;
+        }
 
 		public MqttPacketType Type { get { return MqttPacketType.Publish; } }
 
@@ -23,11 +24,22 @@ namespace System.Net.Mqtt.Packets
 
 		public string Topic { get; }
 
-		public ushort? PacketId { get; }
+		public ushort PacketId { get; }
 
-		public byte[] Payload { get; set; }
+        public Guid OrderId { get; private set; }
 
-		public bool Equals (Publish other)
+        public byte[] Payload { get; set; }
+
+        public void AssignOrder (Guid orderId)
+        {
+            if (OrderId != Guid.Empty) {
+                throw new InvalidOperationException (string.Format (Properties.Resources.OrderedPacket_AlreadyAssignedOrder, nameof (Publish)));
+            }
+
+            OrderId = orderId;
+        }
+
+        public bool Equals (Publish other)
 		{
 			if (other == null)
 				return false;
@@ -61,7 +73,7 @@ namespace System.Net.Mqtt.Packets
 		public static bool operator == (Publish publish, Publish other)
 		{
 			if ((object)publish == null || (object)other == null)
-				return Object.Equals (publish, other);
+				return object.Equals (publish, other);
 
 			return publish.Equals (other);
 		}
@@ -69,7 +81,7 @@ namespace System.Net.Mqtt.Packets
 		public static bool operator != (Publish publish, Publish other)
 		{
 			if ((object)publish == null || (object)other == null)
-				return !Object.Equals (publish, other);
+				return !object.Equals (publish, other);
 
 			return !publish.Equals (other);
 		}
@@ -85,8 +97,8 @@ namespace System.Net.Mqtt.Packets
 				hashCode += BitConverter.ToString (Payload).GetHashCode ();
 			}
 
-			if (PacketId.HasValue) {
-				hashCode += PacketId.Value.GetHashCode ();
+			if (this.HasPacketId ()) {
+				hashCode += PacketId.GetHashCode ();
 			}
 
 			return hashCode;

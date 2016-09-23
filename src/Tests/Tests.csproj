@@ -16,6 +16,9 @@
     <Reference Include="System.Net" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DispatchOrderSpec.cs" />
+    <Compile Include="PacketDispatcherProviderSpec.cs" />
+    <Compile Include="PacketDispatcherSpec.cs" />
     <Compile Include="PrivateChannelFactorySpec.cs" />
     <Compile Include="PrivateChannelProviderSpec.cs" />
     <Compile Include="PrivateChannelSpec.cs" />

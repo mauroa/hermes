@@ -36,7 +36,8 @@ namespace Tests.Flows
 				.Setup (p => p.GetConnection (It.Is<string> (c => c == clientId)))
 				.Returns (channel.Object);
 
-			var flow = new ServerConnectFlow (authenticationProvider, sessionRepository.Object, willRepository.Object, senderFlow.Object);
+			var flow = new ServerConnectFlow (authenticationProvider, Mock.Of<IPacketDispatcherProvider> (), 
+                sessionRepository.Object, willRepository.Object, senderFlow.Object);
 
 			await flow.ExecuteAsync (clientId, connect, channel.Object)
 				.ConfigureAwait(continueOnCapturedContext: false);
@@ -84,7 +85,8 @@ namespace Tests.Flows
 				.Setup (p => p.GetConnection (It.Is<string> (c => c == clientId)))
 				.Returns (channel.Object);
 
-			var flow = new ServerConnectFlow (authenticationProvider, sessionRepository.Object, willRepository.Object, senderFlow.Object);
+			var flow = new ServerConnectFlow (authenticationProvider, Mock.Of<IPacketDispatcherProvider> (), 
+                sessionRepository.Object, willRepository.Object, senderFlow.Object);
 
 			await flow.ExecuteAsync (clientId, connect, channel.Object)
 				.ConfigureAwait(continueOnCapturedContext: false);
@@ -130,7 +132,8 @@ namespace Tests.Flows
 				.Setup (p => p.GetConnection (It.Is<string> (c => c == clientId)))
 				.Returns (channel.Object);
 
-			var flow = new ServerConnectFlow (authenticationProvider, sessionRepository.Object, willRepository.Object, senderFlow.Object);
+			var flow = new ServerConnectFlow (authenticationProvider, Mock.Of<IPacketDispatcherProvider> (),
+                sessionRepository.Object, willRepository.Object, senderFlow.Object);
 
 			await flow.ExecuteAsync (clientId, connect, channel.Object)
 				.ConfigureAwait(continueOnCapturedContext: false);
@@ -175,7 +178,8 @@ namespace Tests.Flows
 				.Setup (p => p.GetConnection (It.Is<string> (c => c == clientId)))
 				.Returns (channel.Object);
 
-			var flow = new ServerConnectFlow (authenticationProvider, sessionRepository.Object, willRepository.Object, senderFlow.Object);
+			var flow = new ServerConnectFlow (authenticationProvider, Mock.Of<IPacketDispatcherProvider> (),
+                sessionRepository.Object, willRepository.Object, senderFlow.Object);
 
 			await flow.ExecuteAsync (clientId, connect, channel.Object)
 				.ConfigureAwait(continueOnCapturedContext: false);
@@ -214,7 +218,8 @@ namespace Tests.Flows
 				.Setup (p => p.GetConnection (It.Is<string> (c => c == clientId)))
 				.Returns (channel.Object);
 
-			var flow = new ServerConnectFlow (authenticationProvider, sessionRepository.Object, willRepository.Object, senderFlow.Object);
+			var flow = new ServerConnectFlow (authenticationProvider, Mock.Of<IPacketDispatcherProvider> (), 
+                sessionRepository.Object, willRepository.Object, senderFlow.Object);
 
 			await flow.ExecuteAsync (clientId, connect, channel.Object)
 				.ConfigureAwait(continueOnCapturedContext: false);
@@ -254,7 +259,8 @@ namespace Tests.Flows
 				.Setup (p => p.GetConnection (It.Is<string> (c => c == clientId)))
 				.Returns (channel.Object);
 
-			var flow = new ServerConnectFlow (authenticationProvider, sessionRepository.Object, willRepository.Object, senderFlow.Object);
+			var flow = new ServerConnectFlow (authenticationProvider, Mock.Of<IPacketDispatcherProvider> (), 
+                sessionRepository.Object, willRepository.Object, senderFlow.Object);
 
 			var aggregateEx = Assert.Throws<AggregateException>(() => flow.ExecuteAsync (clientId, connect, channel.Object).Wait());
 

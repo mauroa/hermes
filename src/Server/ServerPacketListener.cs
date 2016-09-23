@@ -18,7 +18,8 @@ namespace System.Net.Mqtt
 
 		readonly IMqttChannel<IPacket> channel;
 		readonly IConnectionProvider connectionProvider;
-		readonly IProtocolFlowProvider flowProvider;
+        readonly IPacketDispatcherProvider dispatcherProvider;
+        readonly IProtocolFlowProvider flowProvider;
 		readonly MqttConfiguration configuration;
 		readonly ReplaySubject<IPacket> packets;
 		readonly TaskRunner flowRunner;
@@ -29,11 +30,13 @@ namespace System.Net.Mqtt
 
 		public ServerPacketListener (IMqttChannel<IPacket> channel,
 			IConnectionProvider connectionProvider,
-			IProtocolFlowProvider flowProvider,
+            IPacketDispatcherProvider dispatcherProvider,
+            IProtocolFlowProvider flowProvider,
 			MqttConfiguration configuration)
 		{
 			this.channel = channel;
 			this.connectionProvider = connectionProvider;
+            this.dispatcherProvider = dispatcherProvider;
 			this.flowProvider = flowProvider;
 			this.configuration = configuration;
 			packets = new ReplaySubject<IPacket> (window: TimeSpan.FromSeconds (configuration.WaitTimeoutSecs));
@@ -72,6 +75,7 @@ namespace System.Net.Mqtt
 
 				listenerDisposable.Dispose ();
 				packets.OnCompleted ();
+                dispatcherProvider.Dispose ();
 				(flowRunner as IDisposable)?.Dispose ();
 				disposed = true;
 			}
@@ -105,7 +109,7 @@ namespace System.Net.Mqtt
 
 					tracer.Info (ServerProperties.Resources.ServerPacketListener_ConnectPacketReceived, clientId);
 
-					await DispatchPacketAsync (connect)
+					await ExecuteFlowAsync (connect)
 						.ConfigureAwait (continueOnCapturedContext: false);
 				}, async ex => {
 					await HandleConnectionExceptionAsync (ex)
@@ -126,7 +130,9 @@ namespace System.Net.Mqtt
 						return;
 					}
 
-					await DispatchPacketAsync (packet)
+                    RegisterForDispatch (packet as IOrderedPacket);
+
+                    await ExecuteFlowAsync (packet)
 						.ConfigureAwait (continueOnCapturedContext: false);
 				}, async ex => {
 					await NotifyErrorAsync (ex).ConfigureAwait (continueOnCapturedContext: false);
@@ -210,7 +216,38 @@ namespace System.Net.Mqtt
 			return TimeSpan.FromSeconds (tolerance);
 		}
 
-		async Task DispatchPacketAsync (IPacket packet)
+        void RegisterForDispatch (IOrderedPacket packet)
+        {
+            if (packet == null) {
+                return;
+            }
+
+            //No dispatch registration since QoS finishes with these types
+            if (packet.Type == MqttPacketType.PublishAck || packet.Type == MqttPacketType.PublishComplete) {
+                return;
+            }
+
+            var clientDispatcher = dispatcherProvider.GetDispatcher (clientId);
+            var dispatchType = default (DispatchPacketType);
+
+            switch (packet.Type) {
+                case MqttPacketType.Publish:
+                    dispatchType = DispatchPacketType.PublishAck1;
+                    break;
+                case MqttPacketType.PublishReceived:
+                    dispatchType = DispatchPacketType.PublishAck2;
+                    break;
+                case MqttPacketType.PublishRelease:
+                    dispatchType = DispatchPacketType.PublishAck3;
+                    break;
+            }
+
+            var orderId = clientDispatcher.CreateOrder (dispatchType);
+
+            packet.AssignOrder (orderId);
+        }
+
+        async Task ExecuteFlowAsync (IPacket packet)
 		{
 			var flow = flowProvider.GetFlow (packet.Type);
 
@@ -219,26 +256,14 @@ namespace System.Net.Mqtt
 			}
 
 			try {
+                TraceExecution (packet, flow);
 				packets.OnNext (packet);
 
 				await flowRunner.Run (async () => {
-					if (packet.Type == MqttPacketType.Publish) {
-						var publish = packet as Publish;
-
-						tracer.Info (ServerProperties.Resources.ServerPacketListener_DispatchingPublish, flow.GetType ().Name, clientId, publish.Topic);
-					} else if (packet.Type == MqttPacketType.Subscribe) {
-						var subscribe = packet as Subscribe;
-						var topics = subscribe.Subscriptions == null ? new List<string> () : subscribe.Subscriptions.Select (s => s.TopicFilter);
-
-						tracer.Info (ServerProperties.Resources.ServerPacketListener_DispatchingSubscribe, flow.GetType ().Name, clientId, string.Join (", ", topics));
-					} else {
-						tracer.Info (ServerProperties.Resources.ServerPacketListener_DispatchingMessage, packet.Type, flow.GetType ().Name, clientId);
-					}
-
-					await flow.ExecuteAsync (clientId, packet, channel)
+					await flow
+                        .ExecuteAsync (clientId, packet, channel)
 						.ConfigureAwait (continueOnCapturedContext: false);
-				})
-				.ConfigureAwait (continueOnCapturedContext: false);
+				}).ConfigureAwait (continueOnCapturedContext: false);
 			} catch (Exception ex) {
 				if (flow is ServerConnectFlow) {
 					HandleConnectionExceptionAsync (ex).Wait ();
@@ -247,6 +272,22 @@ namespace System.Net.Mqtt
 				}
 			}
 		}
+
+        void TraceExecution (IPacket packet, IProtocolFlow flow)
+ 		{
+            if (packet.Type == MqttPacketType.Publish) {
+                var publish = packet as Publish;
+
+                tracer.Info (ServerProperties.Resources.ServerPacketListener_DispatchingPublish, flow.GetType ().Name, clientId, publish.Topic);
+            } else if (packet.Type == MqttPacketType.Subscribe) {
+                var subscribe = packet as Subscribe;
+                var topics = subscribe.Subscriptions == null ? new List<string> () : subscribe.Subscriptions.Select (s => s.TopicFilter);
+
+                tracer.Info (ServerProperties.Resources.ServerPacketListener_DispatchingSubscribe, flow.GetType ().Name, clientId, string.Join (", ", topics));
+            } else {
+                tracer.Info (ServerProperties.Resources.ServerPacketListener_DispatchingMessage, packet.Type, flow.GetType ().Name, clientId);
+            }
+        }
 
 		async Task NotifyErrorAsync (Exception exception)
 		{

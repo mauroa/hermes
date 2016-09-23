@@ -9,12 +9,14 @@ namespace System.Net.Mqtt.Flows
 	{
 		readonly IMqttAuthenticationProvider authenticationProvider;
 		readonly IConnectionProvider connectionProvider;
-		readonly IPacketIdProvider packetIdProvider;
+        readonly IPacketDispatcherProvider dispatcherProvider;
+        readonly IPacketIdProvider packetIdProvider;
 		readonly ISubject<MqttUndeliveredMessage> undeliveredMessagesListener;
 
 		public ServerProtocolFlowProvider (IMqttAuthenticationProvider authenticationProvider,
 			IConnectionProvider connectionProvider,
-			IMqttTopicEvaluator topicEvaluator,
+            IPacketDispatcherProvider dispatcherProvider,
+            IMqttTopicEvaluator topicEvaluator,
 			IRepositoryProvider repositoryProvider,
 			IPacketIdProvider packetIdProvider,
             ISubject<MqttUndeliveredMessage> undeliveredMessagesListener,
@@ -23,6 +25,7 @@ namespace System.Net.Mqtt.Flows
 		{
 			this.authenticationProvider = authenticationProvider;
 			this.connectionProvider = connectionProvider;
+            this.dispatcherProvider = dispatcherProvider;
 			this.packetIdProvider = packetIdProvider;
 			this.undeliveredMessagesListener = undeliveredMessagesListener;
 		}
@@ -34,14 +37,15 @@ namespace System.Net.Mqtt.Flows
 			var sessionRepository = repositoryProvider.GetRepository<ClientSession>();
 			var willRepository = repositoryProvider.GetRepository<ConnectionWill> ();
 			var retainedRepository = repositoryProvider.GetRepository<RetainedMessage> ();
-			var senderFlow = new PublishSenderFlow (sessionRepository, configuration);
+			var senderFlow = new ServerPublishSenderFlow (connectionProvider, packetIdProvider, dispatcherProvider, sessionRepository, configuration);
 
-			flows.Add (ProtocolFlowType.Connect, new ServerConnectFlow (authenticationProvider, sessionRepository, willRepository, senderFlow));
+			flows.Add (ProtocolFlowType.Connect, new ServerConnectFlow (authenticationProvider, dispatcherProvider, 
+                sessionRepository, willRepository, senderFlow));
 			flows.Add (ProtocolFlowType.PublishSender, senderFlow);
-			flows.Add (ProtocolFlowType.PublishReceiver, new ServerPublishReceiverFlow (topicEvaluator, connectionProvider,
+			flows.Add (ProtocolFlowType.PublishReceiver, new ServerPublishReceiverFlow (topicEvaluator, connectionProvider, dispatcherProvider,
 				senderFlow, retainedRepository, sessionRepository, willRepository, packetIdProvider, undeliveredMessagesListener, configuration));
-			flows.Add (ProtocolFlowType.Subscribe, new ServerSubscribeFlow (topicEvaluator, sessionRepository,
-				retainedRepository, packetIdProvider, senderFlow, configuration));
+			flows.Add (ProtocolFlowType.Subscribe, new ServerSubscribeFlow (senderFlow, dispatcherProvider,
+                packetIdProvider, topicEvaluator, sessionRepository, retainedRepository, configuration));
 			flows.Add (ProtocolFlowType.Unsubscribe, new ServerUnsubscribeFlow (sessionRepository));
 			flows.Add (ProtocolFlowType.Ping, new PingFlow ());
 			flows.Add (ProtocolFlowType.Disconnect, new DisconnectFlow (connectionProvider, sessionRepository, willRepository));

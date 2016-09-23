@@ -24,6 +24,7 @@ namespace System.Net.Mqtt
 		readonly IPacketChannelFactory channelFactory;
 		readonly IProtocolFlowProvider flowProvider;
 		readonly IConnectionProvider connectionProvider;
+        readonly IPacketDispatcherProvider dispatcherProvider;
         readonly ISubject<MqttUndeliveredMessage> undeliveredMessagesListener;
         readonly MqttConfiguration configuration;
         readonly ISubject<PrivateStream> privateStreamListener;
@@ -33,6 +34,7 @@ namespace System.Net.Mqtt
             IPacketChannelFactory channelFactory,
             IProtocolFlowProvider flowProvider,
             IConnectionProvider connectionProvider,
+            IPacketDispatcherProvider dispatcherProvider,
             ISubject<MqttUndeliveredMessage> undeliveredMessagesListener,
             MqttConfiguration configuration)
 		{
@@ -41,6 +43,7 @@ namespace System.Net.Mqtt
             this.channelFactory = channelFactory;
             this.flowProvider = flowProvider;
             this.connectionProvider = connectionProvider;
+            this.dispatcherProvider = dispatcherProvider;
             this.undeliveredMessagesListener = undeliveredMessagesListener;
             this.configuration = configuration;
         }
@@ -120,6 +123,7 @@ namespace System.Net.Mqtt
                     tracer.Info (Properties.Resources.Mqtt_Disposing, GetType ().FullName);
 
                     streamSubscription?.Dispose ();
+                    dispatcherProvider?.Dispose ();
 
                     foreach (var channel in channels)
                     {
@@ -150,7 +154,11 @@ namespace System.Net.Mqtt
 			tracer.Verbose (ServerProperties.Resources.Server_NewSocketAccepted);
 
 			var packetChannel = channelFactory.Create (binaryChannel);
-			var packetListener = new ServerPacketListener (packetChannel, connectionProvider, flowProvider, configuration);
+			var packetListener = new ServerPacketListener (packetChannel, 
+                connectionProvider, 
+                dispatcherProvider, 
+                flowProvider, 
+                configuration);
 
 			packetListener.Listen ();
 			packetListener

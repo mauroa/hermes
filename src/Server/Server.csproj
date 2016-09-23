@@ -20,6 +20,8 @@
     <Compile Include="Bindings\ServerTcpBinding.cs" />
     <Compile Include="Bindings\TcpChannelListener.cs" />
     <Compile Include="Flows\IServerPublishReceiverFlow.cs" />
+    <Compile Include="Flows\IServerPublishSenderFlow.cs" />
+    <Compile Include="Flows\ServerPublishSenderFlow.cs" />
     <Compile Include="IMqttChannelListener.cs" />
     <Compile Include="IMqttConnectedClient.cs" />
     <Compile Include="IMqttServer.cs" />

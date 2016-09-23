@@ -40,7 +40,8 @@ namespace Tests
 			var flowProvider = Mock.Of<IProtocolFlowProvider> ();
 			var connectionProvider = new Mock<IConnectionProvider> ();
 
-			var server = new MqttServer (channelProvider.Object, factory, flowProvider, connectionProvider.Object, Mock.Of<ISubject<MqttUndeliveredMessage>>(), configuration);
+			var server = new MqttServer (channelProvider.Object, factory, flowProvider, connectionProvider.Object,
+                Mock.Of<IPacketDispatcherProvider>(), Mock.Of<ISubject<MqttUndeliveredMessage>>(), configuration);
 
 			sockets.OnNext (Mock.Of<IMqttChannel<byte[]>> (x => x.ReceiverStream == new Subject<byte[]> ()));
 			sockets.OnNext (Mock.Of<IMqttChannel<byte[]>> (x => x.ReceiverStream == new Subject<byte[]> ()));
@@ -78,7 +79,8 @@ namespace Tests
 			var flowProvider = Mock.Of<IProtocolFlowProvider> ();
 			var connectionProvider = new Mock<IConnectionProvider> ();
 
-			var server = new MqttServer (channelProvider.Object, factory, flowProvider, connectionProvider.Object, Mock.Of<ISubject<MqttUndeliveredMessage>> (), configuration);
+			var server = new MqttServer (channelProvider.Object, factory, flowProvider, connectionProvider.Object,
+                Mock.Of<IPacketDispatcherProvider>(), Mock.Of<ISubject<MqttUndeliveredMessage>> (), configuration);
 
 			server.Start ();
 
@@ -117,7 +119,7 @@ namespace Tests
 			var configuration = Mock.Of<MqttConfiguration> (c => c.WaitTimeoutSecs == 60);
 
 			var server = new MqttServer (channelProvider.Object, Mock.Of<IPacketChannelFactory> (x => x.Create (It.IsAny<IMqttChannel<byte[]>> ()) == packetChannel.Object), 
-				flowProvider, connectionProvider.Object, Mock.Of<ISubject<MqttUndeliveredMessage>> (), configuration);
+				flowProvider, connectionProvider.Object, Mock.Of<IPacketDispatcherProvider>(), Mock.Of<ISubject<MqttUndeliveredMessage>> (), configuration);
 
 			server.Start ();
 
@@ -163,7 +165,8 @@ namespace Tests
 			var flowProvider = Mock.Of<IProtocolFlowProvider> ();
 			var connectionProvider = new Mock<IConnectionProvider> ();
 
-			var server = new MqttServer (channelProvider.Object, factory.Object, flowProvider, connectionProvider.Object, Mock.Of<ISubject<MqttUndeliveredMessage>> (), configuration);
+			var server = new MqttServer (channelProvider.Object, factory.Object, flowProvider, connectionProvider.Object,
+                Mock.Of<IPacketDispatcherProvider>(), Mock.Of<ISubject<MqttUndeliveredMessage>> (), configuration);
 			var receiver = new Subject<byte[]> ();
 			var socket = new Mock<IMqttChannel<byte[]>> ();
 

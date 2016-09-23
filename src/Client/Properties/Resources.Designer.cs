@@ -413,6 +413,15 @@ namespace System.Net.Mqtt.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Can&apos;t add items to a dispatch order if the current status is not Active. Current status: {0}.
+        /// </summary>
+        internal static string DispatchOrder_AddInvalid {
+            get {
+                return ResourceManager.GetString("DispatchOrder_AddInvalid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Header Flag {0} is invalid for {1} packet. Expected value: {2}.
         /// </summary>
         internal static string Formatter_InvalidHeaderFlag {
@@ -503,11 +512,47 @@ namespace System.Net.Mqtt.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to The packet of type {0} has already an order assigned.
+        /// </summary>
+        internal static string OrderedPacket_AlreadyAssignedOrder {
+            get {
+                return ResourceManager.GetString("OrderedPacket_AlreadyAssignedOrder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to An inner channel factory is required to create a new packet channel.
         /// </summary>
         internal static string PacketChannelFactory_InnerChannelFactoryNotFound {
             get {
                 return ResourceManager.GetString("PacketChannelFactory_InnerChannelFactoryNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Cannot create an order with Id {0} because it already exists.
+        /// </summary>
+        internal static string PacketDispatcher_CreateOrder_OrderIdAlreadyExists {
+            get {
+                return ResourceManager.GetString("PacketDispatcher_CreateOrder_OrderIdAlreadyExists", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The packet cannot be dispatched because it&apos;s not associated to an existing order. Packet Order Id: {0}.
+        /// </summary>
+        internal static string PacketDispatcher_Dispatch_OrderDoesNotExists {
+            get {
+                return ResourceManager.GetString("PacketDispatcher_Dispatch_OrderDoesNotExists", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to An unexpected error occurred while dispatching orders for packet type {0}.
+        /// </summary>
+        internal static string PacketDispatcher_DispatchOrderError {
+            get {
+                return ResourceManager.GetString("PacketDispatcher_DispatchOrderError", resourceCulture);
             }
         }
         

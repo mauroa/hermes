@@ -20,7 +20,7 @@ namespace System.Net.Mqtt.Storage
 
 		public string Topic { get; set; }
 
-		public ushort? PacketId { get; set; }
+		public ushort PacketId { get; set; }
 
 		public byte[] Payload { get; set; }
 	}

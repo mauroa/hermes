@@ -4,6 +4,7 @@ using System;
 using System.Linq;
 using System.Net.Mqtt;
 using System.Net.Mqtt.Packets;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -75,11 +76,40 @@ namespace IntegrationTests
             };
             var message = new MqttApplicationMessage (topic, Serializer.Serialize(testMessage));
 
+            var publishAckReceived = false;
+            var publishReceivedReceived = false;
+            var publishCompleteReceived = false;
+
+            var exitSignal = new ManualResetEventSlim();
+
+            (client as MqttClient).Channel.ReceiverStream.Subscribe (packet =>
+            {
+                if (packet is PublishAck) {
+                    publishAckReceived = true;
+                }
+                else if (packet is PublishReceived) {
+                    publishReceivedReceived = true;
+                }
+                else if (packet is PublishComplete) {
+                    publishCompleteReceived = true;
+                }
+
+                if (publishAckReceived && publishReceivedReceived && publishCompleteReceived) {
+                    exitSignal.Set ();
+                }
+            });
+
             await client.PublishAsync (message, MqttQualityOfService.AtMostOnce);
             await client.PublishAsync (message, MqttQualityOfService.AtLeastOnce);
             await client.PublishAsync (message, MqttQualityOfService.ExactlyOnce);
 
+            var publishSucceeded = exitSignal.Wait (2000);
+
+            Assert.True (publishSucceeded);
             Assert.True (client.IsConnected);
+            Assert.True (publishAckReceived);
+            Assert.True (publishReceivedReceived);
+            Assert.True (publishCompleteReceived);
 
             client.Dispose ();
         }

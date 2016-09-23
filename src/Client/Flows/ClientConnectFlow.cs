@@ -7,12 +7,15 @@ namespace System.Net.Mqtt.Flows
 {
 	internal class ClientConnectFlow : IProtocolFlow
 	{
-		readonly IRepository<ClientSession> sessionRepository;
+        readonly IPacketDispatcherProvider dispatcherProvider;
+        readonly IRepository<ClientSession> sessionRepository;
 		readonly IPublishSenderFlow senderFlow;
 
-		public ClientConnectFlow (IRepository<ClientSession> sessionRepository,
+		public ClientConnectFlow (IPacketDispatcherProvider dispatcherProvider,
+            IRepository<ClientSession> sessionRepository,
 			IPublishSenderFlow senderFlow)
 		{
+            this.dispatcherProvider = dispatcherProvider;
 			this.sessionRepository = sessionRepository;
 			this.senderFlow = senderFlow;
 		}
@@ -44,8 +47,11 @@ namespace System.Net.Mqtt.Flows
 		async Task SendPendingMessagesAsync (ClientSession session, IMqttChannel<IPacket> channel)
 		{
 			foreach (var pendingMessage in session.GetPendingMessages ()) {
-				var publish = new Publish(pendingMessage.Topic, pendingMessage.QualityOfService,
+				var publish = new Publish (pendingMessage.Topic, pendingMessage.QualityOfService,
 					pendingMessage.Retain, pendingMessage.Duplicated, pendingMessage.PacketId);
+                var orderId = dispatcherProvider.GetDispatcher (session.ClientId).CreateOrder (DispatchPacketType.Publish);
+
+                publish.AssignOrder (orderId);
 
 				await senderFlow
 					.SendPublishAsync (session.ClientId, publish, channel, PendingMessageStatus.PendingToAcknowledge)
@@ -55,16 +61,23 @@ namespace System.Net.Mqtt.Flows
 
 		async Task SendPendingAcknowledgementsAsync (ClientSession session, IMqttChannel<IPacket> channel)
 		{
-			foreach (var pendingAcknowledgement in session.GetPendingAcknowledgements ()) {
-				var ack = default(IFlowPacket);
+            foreach (var pendingAcknowledgement in session.GetPendingAcknowledgements ()) {
+				var ack = default (IOrderedPacket);
 
-				if (pendingAcknowledgement.Type == MqttPacketType.PublishReceived) {
+                if (pendingAcknowledgement.Type == MqttPacketType.PublishReceived) {
 					ack = new PublishReceived (pendingAcknowledgement.PacketId);
-				} else if (pendingAcknowledgement.Type == MqttPacketType.PublishRelease) {
+                } else if (pendingAcknowledgement.Type == MqttPacketType.PublishRelease) {
 					ack = new PublishRelease (pendingAcknowledgement.PacketId);
-				}
+                } else {
+                    //TODO: Check if no other ack should be analyzed
+                    continue;
+                }
 
-				await senderFlow.SendAckAsync (session.ClientId, ack, channel)
+                var orderId = dispatcherProvider.GetDispatcher (session.ClientId).CreateOrder (ack.Type.ToDispatchPacketType ());
+
+                ack.AssignOrder (orderId);
+
+                await senderFlow.SendAckAsync (session.ClientId, ack, channel)
 					.ConfigureAwait (continueOnCapturedContext: false);
 			}
 		}

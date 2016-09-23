@@ -23,7 +23,8 @@ namespace System.Net.Mqtt
 		readonly ReplaySubject<IPacket> sender;
 		readonly IMqttChannel<IPacket> packetChannel;
 		readonly IProtocolFlowProvider flowProvider;
-		readonly IRepository<ClientSession> sessionRepository;
+        readonly IPacketDispatcherProvider dispatcherProvider;
+        readonly IRepository<ClientSession> sessionRepository;
 		readonly IPacketIdProvider packetIdProvider;
 		readonly MqttConfiguration configuration;
 		readonly TaskRunner clientSender;
@@ -31,7 +32,8 @@ namespace System.Net.Mqtt
 
 		internal MqttClient (IMqttChannel<IPacket> packetChannel,
 			IProtocolFlowProvider flowProvider,
-			IRepositoryProvider repositoryProvider,
+            IPacketDispatcherProvider dispatcherProvider,
+            IRepositoryProvider repositoryProvider,
 			IPacketIdProvider packetIdProvider,
 			MqttConfiguration configuration)
 		{
@@ -40,11 +42,12 @@ namespace System.Net.Mqtt
 
 			this.packetChannel = packetChannel;
 			this.flowProvider = flowProvider;
+            this.dispatcherProvider = dispatcherProvider;
 			sessionRepository = repositoryProvider.GetRepository<ClientSession> ();
 			this.packetIdProvider = packetIdProvider;
 			this.configuration = configuration;
 			clientSender = TaskRunner.Get ();
-			packetListener = new ClientPacketListener (packetChannel, flowProvider, configuration);
+			packetListener = new ClientPacketListener (packetChannel, flowProvider, dispatcherProvider, configuration);
 
 			packetListener.Listen ();
             ObservePackets ();
@@ -195,11 +198,14 @@ namespace System.Net.Mqtt
 			}
 
 			try {
-				ushort? packetId = qos == MqttQualityOfService.AtMostOnce ? null : (ushort?)packetIdProvider.GetPacketId ();
+				var packetId = qos == MqttQualityOfService.AtMostOnce ? default (ushort) : packetIdProvider.GetPacketId ();
 				var publish = new Publish (message.Topic, qos, retain, duplicated: false, packetId: packetId)
 				{
 					Payload = message.Payload
 				};
+                var orderId = dispatcherProvider.GetDispatcher (Id).CreateOrder (DispatchPacketType.Publish);
+
+                publish.AssignOrder (orderId);
 
 				var senderFlow = flowProvider.GetFlow<PublishSenderFlow> ();
 
@@ -317,10 +323,11 @@ namespace System.Net.Mqtt
 			tracer.Info (Properties.Resources.Client_Disposing, Id, reason);
 
             receiver?.OnCompleted ();
-            packetsSubscription?.Dispose();
+            packetsSubscription?.Dispose ();
             packetListener?.Dispose();
+            dispatcherProvider?.Dispose ();
             packetChannel?.Dispose();
-            (clientSender as IDisposable)?.Dispose();
+            (clientSender as IDisposable)?.Dispose ();
             IsConnected = false;
             Id = null;
 

@@ -16,6 +16,7 @@ namespace System.Net.Mqtt
 
 		readonly IMqttChannel<IPacket> channel;
 		readonly IProtocolFlowProvider flowProvider;
+        readonly IPacketDispatcherProvider dispatcherProvider;
 		readonly MqttConfiguration configuration;
 		readonly ReplaySubject<IPacket> packets;
 		readonly TaskRunner flowRunner;
@@ -25,11 +26,13 @@ namespace System.Net.Mqtt
 		Timer keepAliveTimer;
 
 		public ClientPacketListener (IMqttChannel<IPacket> channel, 
-			IProtocolFlowProvider flowProvider, 
-			MqttConfiguration configuration)
+			IProtocolFlowProvider flowProvider,
+            IPacketDispatcherProvider dispatcherProvider,
+            MqttConfiguration configuration)
 		{
 			this.channel = channel;
 			this.flowProvider = flowProvider;
+            this.dispatcherProvider = dispatcherProvider;
 			this.configuration = configuration;
 			packets = new ReplaySubject<IPacket> (window: TimeSpan.FromSeconds (configuration.WaitTimeoutSecs));
 			flowRunner = TaskRunner.Get ();
@@ -69,6 +72,7 @@ namespace System.Net.Mqtt
 				listenerDisposable.Dispose ();
 				StopKeepAliveMonitor ();
 				packets.OnCompleted ();
+                dispatcherProvider.Dispose ();
 				(flowRunner as IDisposable)?.Dispose ();
 				disposed = true;
 			}
@@ -93,7 +97,7 @@ namespace System.Net.Mqtt
 						return;
 					}
 
-					await DispatchPacketAsync (packet)
+					await ExecuteFlowAsync (packet)
 						.ConfigureAwait (continueOnCapturedContext: false);
 				}, ex => {
 					NotifyError (ex);
@@ -106,7 +110,9 @@ namespace System.Net.Mqtt
                 .ReceiverStream
 				.Skip (1)
 				.Subscribe (async packet => {
-					await DispatchPacketAsync (packet)
+                    RegisterForDispatch (packet as IOrderedPacket);
+                     
+					await ExecuteFlowAsync (packet)
 						.ConfigureAwait (continueOnCapturedContext: false);
 				}, ex => {
 					NotifyError (ex);
@@ -190,34 +196,71 @@ namespace System.Net.Mqtt
 			}
 		}
 
-		async Task DispatchPacketAsync (IPacket packet)
+        void RegisterForDispatch (IOrderedPacket packet)
+        {
+            if (packet == null)  {
+                return;
+            }
+
+            //No dispatch registration since QoS finishes with these types
+            if (packet.Type == MqttPacketType.PublishAck || packet.Type == MqttPacketType.PublishComplete) {
+                return;
+            }
+
+            var clientDispatcher = dispatcherProvider.GetDispatcher (clientId);
+            var dispatchType = default (DispatchPacketType);
+
+            switch (packet.Type) {
+                case MqttPacketType.Publish:
+                    dispatchType = DispatchPacketType.PublishAck1;
+                    break;
+                case MqttPacketType.PublishReceived:
+                    dispatchType = DispatchPacketType.PublishAck2;
+                    break;
+                case MqttPacketType.PublishRelease:
+                    dispatchType = DispatchPacketType.PublishAck3;
+                    break;
+            }
+
+            var orderId = clientDispatcher.CreateOrder (dispatchType);
+
+            packet.AssignOrder (orderId);
+        }
+
+        async Task ExecuteFlowAsync (IPacket packet)
 		{
 			var flow = flowProvider.GetFlow (packet.Type);
 
-			if (flow != null) {
-				try {
-					packets.OnNext (packet);
-
-					await flowRunner.Run (async () => {
-						var publish = packet as Publish;
-
-						if (publish == null) {
-							tracer.Info (Properties.Resources.ClientPacketListener_DispatchingMessage, clientId, packet.Type, flow.GetType ().Name);
-						} else {
-							tracer.Info (Properties.Resources.ClientPacketListener_DispatchingPublish, clientId, flow.GetType ().Name, publish.Topic);
-						}
-
-						await flow.ExecuteAsync (clientId, packet, channel)
-							.ConfigureAwait (continueOnCapturedContext: false);
-					})
-					.ConfigureAwait (continueOnCapturedContext: false);
-				} catch (Exception ex) {
-					NotifyError (ex);
-				}
+			if (flow == null) {
+                return;
 			}
-		}
 
-		void NotifyError (Exception exception)
+            try {
+                TraceExecution (packet, flow);
+                packets.OnNext (packet);
+
+                await flowRunner.Run (async () => {
+                    await flow
+                        .ExecuteAsync (clientId, packet, channel)
+                        .ConfigureAwait (continueOnCapturedContext: false);
+                }).ConfigureAwait(continueOnCapturedContext: false);
+            } catch (Exception ex) {
+                NotifyError(ex);
+            }
+        }
+
+        void TraceExecution (IPacket packet, IProtocolFlow flow)
+ 		{
+ 			if (packet.Type == MqttPacketType.Publish) {
+ 				var publish = packet as Publish;
+ 
+ 				tracer.Info (Properties.Resources.ClientPacketListener_DispatchingPublish, clientId, flow.GetType ().Name, publish.Topic);
+ 			} else {
+ 				tracer.Info (Properties.Resources.ClientPacketListener_DispatchingMessage, clientId, packet.Type, flow.GetType ().Name);
+ 			}
+ 		}
+
+        void NotifyError (Exception exception)
 		{
 			tracer.Error (exception, Properties.Resources.ClientPacketListener_Error);
 
